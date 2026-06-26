@@ -26,7 +26,8 @@ This is extremely similar to the idea of MoE and also to the LLM-Persona project
 *   This is a little harder, but the vibes are that we can measure what token is the best for a given task and use the expectation-maximization technique to take differentiate tokens with meaning over different sectors
 *   Idea is that we select the best token from a set of tokens at each interval while also maximizing token difference while also maximizing token balance!
     *   So, the regularization will have a term for pushing tokens apart and a term for load-balancing on tokens given a batch
-    *   It should prioritize keeping tokens apart and then prioritize load-balancing
+    *   It should prioritize keeping tokens apart and then prioritize load-balancing as a secondary factor
+    *   This is really fragile so weights are really really important - we should combine the two into one term by weighted sum first (alpha and 1 - alpha) and then multiply the whole thing within the loss
 
 ## Implications
 
