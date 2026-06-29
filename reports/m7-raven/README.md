@@ -2,7 +2,7 @@
 
 **Run date:** 2026-06-29 · **Cluster:** Raven (NVIDIA A100, account `mpib_gpu`) ·
 **Backbone:** `EleutherAI/pythia-160m` · **Corpus:** `dev` recipe (5 domains) · **Steps:** 2000 ·
-**Seeds:** 1 (pilot) · **Methods:** dense, hard_moe, c-BTM, ours (sup), ours (unsup)
+**Seeds:** 1 (pilot) · **Methods:** dense, hard_moe, c-BTM, ours (sup), ours (unsup), ours (unsup + alternating M-step)
 
 This is the first GPU run of the research loop end-to-end (data → EM training → evaluation) on a
 **pretrained** backbone. It is a **pilot**, not the final headline: 1 seed, 2000 steps, 5 domains.
@@ -78,6 +78,14 @@ baselines. Data tokenized with the matching pythia tokenizer (vocab 50,277).
 | **c-BTM** | 5 separate full pythia models, one per cluster | value of parameter *sharing* (1 model vs N) |
 | **ours (sup)** | frozen backbone + learned expert tokens, routed by ground-truth cluster | "can one weight space host K experts?" |
 | **ours (unsup)** | frozen backbone + learned tokens + EM-learned soft router | the full proposal — experts *discovered* by EM |
+| **ours (unsup, alt)** | same, but the **backbone is also trained**, via an alternating M-step | does training the LLM *and* the tokens (not freezing) help? |
+
+**Alternating M-step (the "train the LLM, then the tokens, then the LLM…" scheme).** `ours (unsup,
+alt)` uses block-coordinate optimization: train the backbone θ for a block of steps (lr 5e-5),
+then fine-tune the expert tokens for a block (lr 1e-2), then back to θ, repeating (200-step
+blocks here). Two optimizers, with `requires_grad` toggled so each phase updates only its set —
+verified by `tests/test_alternation.py`. This is the EM M-step done as alternating minimization
+over (θ, e_k) instead of freezing θ. Config: `configs/train/em_alternate.yaml`.
 
 **Training.** 2000 steps, batch 8 × grad-accum 2, cosine schedule. Baselines (full FT) use
 lr `5e-5`; Soft-MoE token banks use lr `1e-2` (prompts want a higher LR). Soft-MoE uses
@@ -93,16 +101,19 @@ per-domain perplexity (oracle vs learned routing) and the specialization suite.
 
 ## 3. Results
 
-From [`main_table.md`](main_table.md) (macro-ppl = equal-weight per-domain perplexity, the
-headline; "+params" = trainable params **added** over a single dense backbone):
+From [`main_table.md`](main_table.md). macro-ppl = equal-weight per-domain perplexity (the
+headline). Two parameter columns: **+params** = trainable params *added over a single dense
+backbone* (the mechanism's overhead); **total-trainable** = params actually updated under the
+config (frozen ⇒ just tokens; full/alternating ⇒ includes the 162M backbone).
 
-| method | macro-ppl ↓ | micro-ppl ↓ | routing-NMI ↑ | util-entropy ↑ | sep ↑ | swap-ratio ↑ | +trainable params ↓ |
-|---|---|---|---|---|---|---|---|
-| dense (full FT) | **26.99** | 25.03 | 0.76* | — | — | — | 0 (all 162M trained) |
-| hard_moe (upcycled) | 27.97 | 25.95 | 0.76* | — | — | — | 226.7M |
-| c-BTM (5 models) | 30.22 | 28.32 | 0.76* | 0.97 | — | — | 649.1M |
-| ours (sup) | 35.66 | 32.46 | 0.76 | 0.97 | 1.25 | **1.18** | **15.4K** |
-| ours (unsup) | 35.20 | 32.22 | **0.83** | 0.97 | 1.25 | **1.22** | **0.61M** |
+| method | macro-ppl ↓ | micro-ppl ↓ | routing-NMI ↑ | util-ent ↑ | sep ↑ | swap-ratio ↑ | +params (over dense) ↓ | total-trainable ↓ |
+|---|---|---|---|---|---|---|---|---|
+| dense (full FT) | **26.99** | 25.03 | 0.76* | — | — | — | 0 | 162.3M |
+| hard_moe (upcycled) | 27.97 | 25.95 | 0.76* | — | — | — | 226.7M | 389.0M |
+| **ours (unsup, alt)** | 28.49 | 26.06 | **0.835** | 0.98 | 1.25 | 1.04 | 0.61M | 162.9M |
+| c-BTM (5 models) | 30.22 | 28.32 | 0.76* | 0.97 | — | — | 649.1M | 811.4M |
+| ours (sup, frozen) | 35.66 | 32.46 | 0.76 | 0.97 | 1.25 | **1.18** | **15.4K** | **15.4K** |
+| ours (unsup, frozen) | 35.20 | 32.22 | 0.83 | 0.97 | 1.25 | **1.22** | **0.61M** | **0.61M** |
 
 \* For dense/hard_moe/c-BTM the routing-NMI column reports the *k-means clusterer's* NMI vs
 domains (0.76); these methods have no per-document expert router, so it is a baseline reference,
@@ -110,26 +121,29 @@ not a learned-router score.
 
 ### What the numbers say (honestly)
 
-1. **Quality:** full fine-tuning wins on raw perplexity (dense 27.0), with the upcycled MoE
-   essentially matching it (28.0) and c-BTM a bit behind (30.2 — each of its 5 models sees only
-   ~1/5 of the data in 2000 steps). The frozen-token methods are ~30% higher (35.2–35.7).
-   **The Soft-MoE methods do *not* beat full fine-tuning on quality — and shouldn't be expected
-   to at this scale.** They steer a frozen model; the baselines update all 162M weights.
+1. **Two distinct operating points for "ours", and the alternation knob moves between them:**
+   - **Frozen backbone (param-light):** ppl ~35, trains only **15K–610K** params, but strong
+     per-token specialization (swap 1.18–1.22).
+   - **Alternating M-step (full quality):** ppl **28.5**, ≈ dense (27.0) and hard_moe (28.0) and
+     **better than c-BTM (30.2)** — because the LLM itself now adapts. But this trains the whole
+     **162.9M** backbone (the "+params 0.61M" column is misleading on its own here — see
+     total-trainable), and the per-token specialization *drops* (swap 1.04, see §3.1): a capable
+     trained backbone absorbs most of the domain modelling, so the tokens carry less of the load.
 
-2. **Efficiency is the real story.** ours reaches within ~30% of full-FT perplexity while
-   training **15K–610K** parameters — **3–4 orders of magnitude fewer** than dense (162M),
-   hard_moe (+227M) or c-BTM (+649M). "One frozen weight space + a tiny token bank" is a viable
-   operating point, which is the thesis.
+2. **The thesis, stated carefully.** A tiny token bank on a *frozen* backbone reaches within ~30%
+   of full-FT perplexity at 3–4 orders of magnitude fewer trainable params (the efficiency story).
+   Letting the backbone train *alternately* with the tokens closes the quality gap to full FT
+   while still discovering domains (NMI 0.835, the best of any method) — at full-backbone training
+   cost. Neither variant "beats" dense on raw quality at this scale; they occupy different
+   quality/efficiency/specialization trade-offs.
 
-3. **Specialization is real (only the Soft-MoE methods have it):**
-   - **Swap test passes (1.18–1.22):** routing an input through the *wrong* expert raises
-     perplexity 18–22%. The expert tokens carry genuine, non-interchangeable expertise — the
-     strongest causal evidence in the plan.
-   - **Unsupervised EM beats its own seed:** ours (unsup) routing-NMI **0.83 > 0.76**, the
-     k-means partition it was initialized from. The EM loop *refined* the domain structure rather
-     than just memorizing the clusterer. It also edges out ours (sup) on macro-ppl (35.2 vs 35.7).
-   - Experts are **well-utilized** (normalized usage-entropy 0.97, ~no dead experts) and
-     **well-separated** (mean pairwise cosine distance 1.25).
+3. **Specialization is real (the Soft-MoE methods only):**
+   - **Swap test:** routing through the *wrong* expert raises ppl — strongly for the frozen
+     variants (18–22%), mildly for the alternating one (4%, because its trained backbone is
+     already strong on every domain). Either way the tokens carry genuine expertise.
+   - **Unsupervised EM beats its own seed:** routing-NMI **0.83–0.835 > 0.76**, the k-means
+     partition it was initialized from — EM *refined* the partition rather than memorizing it.
+   - Experts are **well-utilized** (norm usage-entropy ~0.97) and **well-separated** (sep 1.25).
 
 Figures in [`figures/`](figures/): `quality_vs_params.png` (the efficiency frontier),
 `contingency_*.png` (expert×domain heatmaps), `utilization_*.png`, `routing_gap.png`.
@@ -139,14 +153,15 @@ Figures in [`figures/`](figures/): `quality_vs_params.png` (the efficiency front
 Beyond the binary swap test, we route **every domain's test set through every expert** and
 measure per-domain perplexity — the full `[domain × expert]` matrix
 ([`cross_routing_dev.md`](cross_routing_dev.md), produced by `scripts/cross_routing.py`). For all
-three methods with per-document experts, **the lowest-perplexity expert is the domain's own
+**four** methods with per-document experts, **the lowest-perplexity expert is the domain's own
 matched expert for 100% of domains** (clean diagonal). The *magnitude* of specialization differs
 sharply and tells the central story:
 
 | method | mean self-expert ppl | mean other-expert ppl | ×worse through wrong expert | best-is-self |
 |---|---|---|---|---|
-| ours (sup) | 35.4 | 44.3 | **1.25×** | 5/5 |
-| ours (unsup) | 35.0 | 44.8 | **1.28×** | 5/5 |
+| ours (sup, frozen) | 35.4 | 44.3 | **1.25×** | 5/5 |
+| ours (unsup, frozen) | 35.0 | 44.8 | **1.28×** | 5/5 |
+| ours (unsup, alt) | 28.5 | 29.8 | 1.05× | 5/5 |
 | c-BTM | 29.8 | 161.5 | **5.41×** | 5/5 |
 
 - **ours (sup/unsup):** each domain is best modelled by its own expert token, ~25–28% worse
@@ -154,9 +169,18 @@ sharply and tells the central story:
   backbone still models all language well, so the cross-routing penalty is bounded). The learned
   expert↔domain assignment is interpretable and matches the data clustering: e0←{wiki, news}
   (the two prose domains share an expert), e1←reviews, e2←arxiv, e3←pubmed.
+- **ours (unsup, alt):** still a clean diagonal (5/5 best-is-self) but the gaps shrink to ~1.05×,
+  and the absolute per-domain ppls are much lower (arxiv 20.9, pubmed 19.1 vs the frozen variant's
+  30.3 / 24.8). Training the backbone makes it strong on *every* domain, so the expert tokens add
+  only a small per-domain edge — better quality, weaker token-carried specialization. A direct
+  illustration of the freeze-vs-train trade-off the alternation knob controls.
 - **c-BTM:** routing a domain through the wrong model is catastrophic (e.g. news through arxiv's
   model → ppl ~640; mean 5.4× worse). Fully-separate models hyper-specialize but **collapse on
   foreign domains** — the cost of *not* sharing a backbone, at +649M params.
+
+The specialization strength thus spans an interpretable spectrum — **alt 1.05× → frozen 1.25× →
+c-BTM 5.4×** — trading raw quality and parameter cost against how much expertise the experts (vs
+the shared backbone) carry.
 
 This is the cleanest single illustration of the thesis: **a tiny token bank over one shared
 backbone buys genuine, correctly-aligned per-domain expertise (1.25×) without the parameter

@@ -28,6 +28,20 @@ Perplexity of each **domain** (row) routed through each **expert** (column). `*`
 
 **Summary:** mean self-expert ppl 35.0 vs mean other-expert ppl 44.8 → **1.28× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
 
+### ours_unsup_alt
+
+Perplexity of each **domain** (row) routed through each **expert** (column). `*` marks the domain's own (routed/cluster) expert; **bold** marks the lowest-perplexity expert in the row. Specialization ⇒ the `*` and **bold** coincide and the diagonal is well below the rest.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | self-ppl | other-mean | ×worse |
+|---|---|---|---|---|---|---|---|---|
+| wiki | **28.0*** | 29.0 | 29.4 | 29.2 | 29.4 | 28.0 | 29.2 | 1.05× |
+| news | **35.6*** | 37.1 | 37.4 | 37.1 | 37.3 | 35.6 | 37.2 | 1.05× |
+| reviews | 39.9 | **38.9*** | 41.3 | 41.0 | 41.1 | 38.9 | 40.8 | 1.05× |
+| arxiv | 21.4 | 22.8 | **20.9*** | 21.7 | 21.1 | 20.9 | 21.8 | 1.04× |
+| pubmed | 19.5 | 20.3 | 19.6 | **19.1*** | 19.7 | 19.1 | 19.8 | 1.04× |
+
+**Summary:** mean self-expert ppl 28.5 vs mean other-expert ppl 29.8 → **1.05× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
+
 ### cbtm
 
 Perplexity of each **domain** (row) routed through each **expert** (column). `*` marks the domain's own (routed/cluster) expert; **bold** marks the lowest-perplexity expert in the row. Specialization ⇒ the `*` and **bold** coincide and the diagonal is well below the rest.
