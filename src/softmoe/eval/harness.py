@@ -75,6 +75,9 @@ def run_eval(model, processed_dir, cfg, device: str = "cpu") -> dict:
         metrics["added_trainable_params"] = int(getattr(model, "num_added_trainable_params", lambda: 0)())
 
     metrics["total_params"] = int(sum(p.numel() for p in model.parameters()))
+    # Total params actually updated under this config (frozen backbone ⇒ just tokens/router;
+    # full/alternating ⇒ includes the backbone). Distinct from "added over a dense backbone".
+    metrics["trainable_params"] = int(sum(p.numel() for p in model.parameters() if p.requires_grad))
     return metrics
 
 
