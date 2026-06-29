@@ -1,6 +1,6 @@
 """Aggregate many runs' ``metrics.json`` into the comparison table + CSV + figures.
 
-Produces ``report/main_table.md`` and ``report/results.csv`` (rows = methods/regimes), plus
+Produces ``<out>/main_table.md`` and ``<out>/results.csv`` (rows = methods/regimes), plus
 matplotlib figures: quality-vs-added-params, expert×domain contingency heatmaps, utilization
 histograms, and the oracle-vs-learned routing-gap bar chart.
 """

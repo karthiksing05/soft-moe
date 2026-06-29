@@ -159,12 +159,12 @@ Figures in [`figures/`](figures/): `quality_vs_params.png` (the efficiency front
 # on Raven (env: module load python-waterboa/2025.06 + the project .venv)
 DATA=/ptmp/$USER/soft-moe/data
 python scripts/build_data.py     --config configs/experiment/ours_unsup_dev.yaml --data-root $DATA
-python scripts/analyze_domains.py --processed-dir $DATA/processed/dev --out report/domain_analysis_dev.md
+python scripts/analyze_domains.py --processed-dir $DATA/processed/dev --out reports/m7-raven/domain_analysis_dev.md
 for m in dense_dev hard_moe_dev cbtm_dev ours_sup_dev ours_unsup_dev; do
   python scripts/train.py --config configs/experiment/$m.yaml --data-root $DATA \
     --run-dir /ptmp/$USER/soft-moe/experiments/$m --device cuda
 done
-python scripts/make_report.py --runs /ptmp/$USER/soft-moe/experiments --out report
+python scripts/make_report.py --runs /ptmp/$USER/soft-moe/experiments --out reports/m7-raven
 ```
 SLURM scripts used: `.slurm/prep_dev.sbatch`, `.slurm/train_dev.sbatch <config>`,
 `.slurm/eval_report.sbatch`. `/ptmp` is purged — keeper artifacts copied to

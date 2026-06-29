@@ -42,4 +42,3 @@ Testing against the following ideas:
 *   MoP - prompt embeddings
 *   Our solution but with a fixed and well-defined set of tokens (orthogonal, constant)
     *   Can see here how the idea of learning the embeddings improves or hinders performance
-

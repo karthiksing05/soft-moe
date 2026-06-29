@@ -32,12 +32,14 @@ no model download. End-to-end for the headline method:
 python scripts/build_data.py  --config configs/experiment/ours_unsup.yaml
 python scripts/train.py       --config configs/experiment/ours_unsup.yaml --device cpu
 python scripts/evaluate.py    --run experiments/ours_unsup_seed0
-python scripts/make_report.py --runs experiments --out report
+python scripts/make_report.py --runs experiments --out reports/latest
 ```
 
 Run every method (`dense`, `hard_moe`, `cbtm`, `mop`, `ours_fixed`, `ours_sup`, `ours_unsup`)
 the same way — only the `--config` changes — then `make_report.py` emits the comparison table
-(`report/main_table.md`, `report/results.csv`) and figures (`report/figures/`).
+(`reports/latest/main_table.md`, `results.csv`) and figures. Curated, committed run reports live
+in `reports/<run>/` (e.g. [`reports/m7-raven/`](reports/m7-raven/)); `reports/latest/` is the
+gitignored scratch dump for ad-hoc runs.
 
 ## Layout
 
@@ -52,7 +54,8 @@ src/softmoe/
 scripts/        # thin CLI entrypoints
 tests/          # pytest: data, losses, model (grad flow), metric math, hermetic end-to-end smoke
 experiments/    # run outputs (gitignored): checkpoints, metrics.json, resolved_config.yaml
-data/ report/   # gitignored
+reports/        # curated run reports (tracked, e.g. reports/m7-raven/); reports/latest/ is scratch
+data/           # gitignored corpora
 ```
 
 ## Key ideas in code
