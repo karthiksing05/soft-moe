@@ -40,6 +40,7 @@ softmoe-train = "softmoe.cli.train:main"
 softmoe-evaluate = "softmoe.cli.evaluate:main"
 softmoe-make-report = "softmoe.cli.make_report:main"
 softmoe-analyze-domains = "softmoe.cli.analyze_domains:main"
+softmoe-cross-routing = "softmoe.cli.cross_routing:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

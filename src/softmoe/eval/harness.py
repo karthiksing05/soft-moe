@@ -78,11 +78,13 @@ def run_eval(model, processed_dir, cfg, device: str = "cpu") -> dict:
     return metrics
 
 
-def evaluate_run(run_dir: str | Path, data_root: str = "data", device: str | None = None) -> dict:
+def load_run_model(run_dir: str | Path, data_root: str = "data"):
+    """Rebuild a run's model from its resolved config and load ``checkpoints/best.pt``.
+
+    Returns ``(model, cfg, CorpusPaths)``. Shared by ``evaluate_run`` and the cross-routing CLI.
+    """
     run_dir = Path(run_dir)
     cfg = _load_run_config(run_dir)
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-
     recipe = cfg.get_path("data.recipe")
     paths = CorpusPaths.for_recipe(Path(data_root), recipe)
     if not paths.meta.exists():
@@ -100,8 +102,14 @@ def evaluate_run(run_dir: str | Path, data_root: str = "data", device: str | Non
         model.load_state_dict(state["model"])
         logger.info("[eval] loaded %s (step %s)", best, state.get("step"))
     else:
-        logger.warning("[eval] no checkpoint at %s — evaluating randomly-initialized model.", best)
+        logger.warning("[eval] no checkpoint at %s — using a randomly-initialized model.", best)
+    return model, cfg, paths
 
+
+def evaluate_run(run_dir: str | Path, data_root: str = "data", device: str | None = None) -> dict:
+    run_dir = Path(run_dir)
+    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    model, cfg, paths = load_run_model(run_dir, data_root)
     metrics = run_eval(model, paths.root, cfg, device)
     out = run_dir / "metrics.json"
     with open(out, "w") as fh:
