@@ -10,7 +10,7 @@ Its purpose is to (a) validate the full pipeline on real data/GPU, (b) get a fir
 comparison of the methods, and (c) document that the training corpus has genuinely distinct,
 relevant domains. Artifacts in this folder: [`main_table.md`](main_table.md),
 [`results.csv`](results.csv), [`domain_analysis_dev.md`](domain_analysis_dev.md),
-[`figures/`](figures/).
+[`cross_routing_dev.md`](cross_routing_dev.md) (expert×domain matrix), [`figures/`](figures/).
 
 ---
 
@@ -133,6 +133,34 @@ not a learned-router score.
 
 Figures in [`figures/`](figures/): `quality_vs_params.png` (the efficiency frontier),
 `contingency_*.png` (expert×domain heatmaps), `utilization_*.png`, `routing_gap.png`.
+
+### 3.1 Expert × domain cross-routing (does each domain prefer its own expert?)
+
+Beyond the binary swap test, we route **every domain's test set through every expert** and
+measure per-domain perplexity — the full `[domain × expert]` matrix
+([`cross_routing_dev.md`](cross_routing_dev.md), produced by `scripts/cross_routing.py`). For all
+three methods with per-document experts, **the lowest-perplexity expert is the domain's own
+matched expert for 100% of domains** (clean diagonal). The *magnitude* of specialization differs
+sharply and tells the central story:
+
+| method | mean self-expert ppl | mean other-expert ppl | ×worse through wrong expert | best-is-self |
+|---|---|---|---|---|
+| ours (sup) | 35.4 | 44.3 | **1.25×** | 5/5 |
+| ours (unsup) | 35.0 | 44.8 | **1.28×** | 5/5 |
+| c-BTM | 29.8 | 161.5 | **5.41×** | 5/5 |
+
+- **ours (sup/unsup):** each domain is best modelled by its own expert token, ~25–28% worse
+  through any other — moderate, clean specialization layered on a **shared** frozen backbone (the
+  backbone still models all language well, so the cross-routing penalty is bounded). The learned
+  expert↔domain assignment is interpretable and matches the data clustering: e0←{wiki, news}
+  (the two prose domains share an expert), e1←reviews, e2←arxiv, e3←pubmed.
+- **c-BTM:** routing a domain through the wrong model is catastrophic (e.g. news through arxiv's
+  model → ppl ~640; mean 5.4× worse). Fully-separate models hyper-specialize but **collapse on
+  foreign domains** — the cost of *not* sharing a backbone, at +649M params.
+
+This is the cleanest single illustration of the thesis: **a tiny token bank over one shared
+backbone buys genuine, correctly-aligned per-domain expertise (1.25×) without the parameter
+blow-up or the brittle cross-domain collapse of N separate models.**
 
 ---
 
