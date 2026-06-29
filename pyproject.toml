@@ -39,6 +39,7 @@ softmoe-build-data = "softmoe.cli.build_data:main"
 softmoe-train = "softmoe.cli.train:main"
 softmoe-evaluate = "softmoe.cli.evaluate:main"
 softmoe-make-report = "softmoe.cli.make_report:main"
+softmoe-analyze-domains = "softmoe.cli.analyze_domains:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
