@@ -1,0 +1,15 @@
+# Online soft-EM (default). sep > balance, per the brainstorm priority.
+train:
+  max_steps: 80
+  batch_size: 8
+  grad_accum: 1
+  grad_clip: 1.0
+  eval_every: 40
+  log_every: 10
+  keep_last: 1
+  balanced_sampler: false
+  em: { mode: soft, reassign_every: 0 }
+  lambdas: { sep: 1.0, balance: 0.1, route: 0.5 }
+  optimizer: { name: adamw, lr: 1.0e-3, wd: 0.0 }
+  scheduler: cosine
+  wandb: { enabled: false, project: softmoe }

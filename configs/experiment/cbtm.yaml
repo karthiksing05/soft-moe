@@ -1,0 +1,10 @@
+# Baseline: c-BTM (N separate expert models, one per cluster; ensemble at eval).
+defaults: [/data/synth, /model/backbone_tiny, /train/supervised, /eval/default]
+meta: { name: cbtm, regime: cbtm }
+model:
+  method: cbtm
+  n_clusters: auto
+  route_by: cluster
+train:
+  lambdas: { sep: 0.0, balance: 0.0, route: 0.0 }
+seed: 0

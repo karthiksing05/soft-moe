@@ -1,0 +1,11 @@
+# Baseline: MoP (mixture-of-prompts, jointly trained, NO EM). Isolates the EM contribution.
+defaults: [/data/synth, /model/backbone_tiny, /train/joint_mop, /eval/default]
+meta: { name: mop, regime: mop }
+model:
+  method: softmoe
+  backbone_mode: frozen
+  injection: prefix
+  mop_average: true
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: random, trainable: true }
+  router: { kind: soft, top_k: 1, pool: meanhidden }
+seed: 0

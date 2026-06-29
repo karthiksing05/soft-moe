@@ -1,0 +1,3 @@
+# Real gpt2 (124M) — dev backbone knob.
+model:
+  backbone: { kind: hf, name: gpt2 }

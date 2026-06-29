@@ -1,0 +1,11 @@
+# Ours (supervised): E-step = ground-truth cluster label. "Can one weight space hold K experts?"
+defaults: [/data/synth, /model/backbone_tiny, /train/supervised, /eval/default]
+meta: { name: ours_sup, regime: ours_sup }
+model:
+  method: softmoe
+  backbone_mode: frozen
+  injection: prefix
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: from_cluster_centroids, trainable: true }
+  router: { kind: supervised, route_by: cluster }
+  router_supervise_with: cluster
+seed: 0

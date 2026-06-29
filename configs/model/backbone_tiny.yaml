@@ -1,0 +1,5 @@
+# Tiny random GPT-2, built locally (no download). For toy/smoke and the test suite.
+model:
+  backbone:
+    kind: tiny
+    tiny: { n_embd: 64, n_layer: 2, n_head: 2, n_inner: 128, n_positions: 256 }

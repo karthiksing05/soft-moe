@@ -1,0 +1,11 @@
+# Ours (unsupervised): learned soft router discovers the assignment via EM. The headline proposal.
+defaults: [/data/synth, /model/backbone_tiny, /train/em_soft, /eval/default]
+meta: { name: ours_unsup, regime: ours_unsup }
+model:
+  method: softmoe
+  backbone_mode: frozen
+  injection: prefix
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: from_cluster_centroids, trainable: true }
+  router: { kind: soft, top_k: 1, pool: meanhidden }
+  router_supervise_with: cluster
+seed: 0

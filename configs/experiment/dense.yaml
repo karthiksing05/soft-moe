@@ -1,0 +1,7 @@
+# Baseline: Dense (single backbone, no experts). Lower bound.
+defaults: [/data/synth, /model/backbone_tiny, /train/supervised, /eval/default]
+meta: { name: dense, regime: dense }
+model:
+  method: dense
+  backbone_mode: full
+seed: 0

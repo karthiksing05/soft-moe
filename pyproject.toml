@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "softmoe"
+version = "0.1.0"
+description = "Soft-MoE-style partitioning within a single LLM via EM-discovered expert tokens"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "torch>=2.1",
+    "transformers>=4.40",
+    "datasets>=2.18",
+    "tokenizers>=0.15",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
+    "scipy>=1.10",
+    "pyyaml>=6.0",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+    "matplotlib>=3.7",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+# Heavy / optional deps, gated so the core + smoke tests install light.
+embed = ["sentence-transformers>=2.2"]
+cobweb = ["concept_formation>=0.4"]
+wandb = ["wandb>=0.16"]
+dev = ["pytest>=7.4", "pytest-timeout>=2.2"]
+
+[project.scripts]
+softmoe-build-data = "softmoe.cli.build_data:main"
+softmoe-train = "softmoe.cli.train:main"
+softmoe-evaluate = "softmoe.cli.evaluate:main"
+softmoe-make-report = "softmoe.cli.make_report:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]

@@ -1,0 +1,17 @@
+# Offline synthetic recipe: 4 near-orthogonal domains, no network. Used by the test suite and
+# any fully-hermetic smoke run. THEORY §E.1 endorses controlled domain mixtures as the
+# identifiability diagnostic. Pairs with model/backbone_tiny + tokenizer 'bytes'.
+data:
+  recipe: synth
+  block_size: 64
+  tokenizer: bytes
+  embedding_method: tfidf
+  clusterer:
+    kind: kmeans
+    n_clusters: 4
+  domains:
+    - { name: english,    source: synthetic, generator: english,    max_docs: 200, min_chars: 1 }
+    - { name: code,       source: synthetic, generator: code,       max_docs: 200, min_chars: 1 }
+    - { name: arithmetic, source: synthetic, generator: arithmetic, max_docs: 200, min_chars: 1 }
+    - { name: formal,     source: synthetic, generator: formal,     max_docs: 200, min_chars: 1 }
+  splits: { train: 0.8, val: 0.1, test: 0.1 }

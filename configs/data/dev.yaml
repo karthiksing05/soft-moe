@@ -1,0 +1,20 @@
+# Dev recipe: 4-6 hand-picked HF domains, gpt2 tokens, sentence embeddings for clustering.
+# For iterating (M5-M6) on a single GPU. Swap hf_path/hf_config to taste; some sources are large
+# (streamed + capped by max_docs). Anchored toward the c-BTM corpus where possible.
+data:
+  recipe: dev
+  block_size: 512
+  tokenizer: gpt2
+  embedding_method: sentence
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2
+  clusterer:
+    kind: kmeans
+    n_clusters: 6
+  domains:
+    - { name: wiki,    source: hf, hf_path: wikitext,        hf_config: wikitext-103-raw-v1, split: train, text_field: text,    max_docs: 20000, min_chars: 200 }
+    - { name: news,    source: hf, hf_path: ag_news,                                          split: train, text_field: text,    max_docs: 20000, min_chars: 64  }
+    - { name: reviews, source: hf, hf_path: imdb,                                             split: train, text_field: text,    max_docs: 20000, min_chars: 200 }
+    - { name: code,    source: hf, hf_path: code_search_net, hf_config: python,               split: train, text_field: whole_func_string, max_docs: 20000, min_chars: 64 }
+    - { name: arxiv,   source: hf, hf_path: ccdv/arxiv-summarization,                          split: train, text_field: abstract, max_docs: 20000, min_chars: 200 }
+    - { name: pubmed,  source: hf, hf_path: ccdv/pubmed-summarization,                         split: train, text_field: abstract, max_docs: 20000, min_chars: 200 }
+  splits: { train: 0.9, val: 0.05, test: 0.05 }
