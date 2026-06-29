@@ -11,9 +11,12 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 dependencies = [
     "torch>=2.1",
-    "transformers>=4.40",
-    "datasets>=2.18",
-    "tokenizers>=0.15",
+    # HF stack pinned below 5.x: datasets 5.0 + huggingface_hub 1.x have a streaming
+    # HfUriError on standard datasets, and transformers 5.x breaks the 4.x API this code uses.
+    "transformers>=4.40,<5",
+    "datasets>=2.18,<4",
+    "huggingface_hub>=0.34,<1",
+    "tokenizers>=0.15,<0.23",
     "numpy>=1.24",
     "scikit-learn>=1.3",
     "scipy>=1.10",
