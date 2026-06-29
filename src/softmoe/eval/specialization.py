@@ -60,7 +60,9 @@ def utilization_metrics(pred_expert: np.ndarray, n_experts: int) -> dict:
 def token_separation(embeddings: torch.Tensor) -> dict:
     """``embeddings``: [n_experts, T, d] or [n_experts, D]. Mean pairwise cosine *distance* +
     effective rank + log-det volume of the (normalized) token matrix."""
-    E = embeddings.detach().reshape(embeddings.shape[0], -1).float()
+    # Compute on CPU: the token matrix is tiny (K x T*d) and this keeps the helper eye/
+    # identity tensors on the same device as E regardless of where the model lives (GPU).
+    E = embeddings.detach().reshape(embeddings.shape[0], -1).float().cpu()
     n = E.shape[0]
     if n < 2:
         return {"mean_pairwise_cosine_distance": 0.0, "effective_rank": 1.0, "logdet_volume": 0.0}
