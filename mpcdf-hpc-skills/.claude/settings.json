@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh*)",
+      "Bash(scp*)",
+      "Bash(rsync*)",
+      "Bash(grep*)",
+      "Bash(ls*)",
+      "Bash(test*)",
+      "Bash(find*)",
+      "Bash(mkdir*)",
+      "Bash(which*)",
+      "Bash(code*)",
+      "Bash(printf*)",
+      "Bash(echo*)",
+      "Bash(sleep*)",
+      "Bash(cat*)",
+      "Bash(head*)",
+      "Bash(tail*)",
+      "Bash(awk*)",
+      "Bash(sed*)",
+      "Bash(squeue*)",
+      "Bash(sinfo*)",
+      "Bash(sacct*)",
+      "Bash(scontrol*)"
+    ],
+    "deny": []
+  }
+}

@@ -99,3 +99,10 @@ checkpoints/
 runs/
 logs/
 outputs/
+
+# Claude Code local session state (shared commands/skills/settings.json stay tracked)
+.claude/settings.local.json
+.claude/*.local.json
+
+# other
+mpcdf-hpc-skills.zip
