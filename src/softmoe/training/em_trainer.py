@@ -55,6 +55,63 @@ class EMTrainer:
             sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda _: 1.0)
         return opt, sched
 
+    # ---- alternating (block-coordinate) M-step ---------------------------------------
+    def _partition_params(self, model):
+        """Split trainable params into (backbone θ, expert-token/router) groups."""
+        backbone = list(getattr(model, "backbone", torch.nn.Module()).parameters())
+        backbone_ids = {id(p) for p in backbone}
+        backbone = [p for p in backbone if p.requires_grad]
+        expert = [p for p in model.parameters() if id(p) not in backbone_ids and p.requires_grad]
+        return backbone, expert
+
+    def _build_alternating(self, model, max_steps: int, alt: dict):
+        """Two optimizers (backbone vs expert tokens) for the alternation schedule."""
+        backbone, expert = self._partition_params(model)
+        if not backbone:
+            raise ValueError(
+                "train.alternation needs a trainable backbone — set model.backbone_mode: full "
+                "(alternation updates the LLM θ, which a frozen backbone forbids)."
+            )
+        if not expert:
+            raise ValueError("train.alternation found no expert-token params to alternate with.")
+        bb_steps = int(alt.get("backbone_steps", 200))
+        tok_steps = int(alt.get("token_steps", 200))
+        cycle = bb_steps + tok_steps
+        # cosine T_max ≈ the number of update steps each optimizer will actually take
+        bb_total = max(1, int(round(max_steps * bb_steps / cycle)))
+        tok_total = max(1, int(round(max_steps * tok_steps / cycle)))
+        opt_bb = torch.optim.AdamW(backbone, lr=float(alt.get("backbone_lr", 5e-5)),
+                                   weight_decay=float(alt.get("backbone_wd", 0.0)))
+        opt_tok = torch.optim.AdamW(expert, lr=float(alt.get("token_lr", 1e-2)),
+                                    weight_decay=float(alt.get("token_wd", 0.0)))
+        sched_bb = torch.optim.lr_scheduler.CosineAnnealingLR(opt_bb, T_max=bb_total)
+        sched_tok = torch.optim.lr_scheduler.CosineAnnealingLR(opt_tok, T_max=tok_total)
+        logger.info("[alternation] backbone %d params (lr %.1e, %d-step blocks) ⇄ "
+                    "tokens %d params (lr %.1e, %d-step blocks), start=%s",
+                    sum(p.numel() for p in backbone), float(alt.get("backbone_lr", 5e-5)), bb_steps,
+                    sum(p.numel() for p in expert), float(alt.get("token_lr", 1e-2)), tok_steps,
+                    alt.get("start", "backbone"))
+        return {"opt_bb": opt_bb, "opt_tok": opt_tok, "sched_bb": sched_bb, "sched_tok": sched_tok,
+                "backbone": backbone, "expert": expert, "bb_steps": bb_steps, "tok_steps": tok_steps,
+                "start": alt.get("start", "backbone"), "cur": None}
+
+    @staticmethod
+    def _phase_for_step(step: int, bb_steps: int, tok_steps: int, start: str) -> str:
+        pos = (step - 1) % (bb_steps + tok_steps)
+        first, second = ("backbone", "tokens") if start == "backbone" else ("tokens", "backbone")
+        return first if pos < (bb_steps if start == "backbone" else tok_steps) else second
+
+    def _set_phase(self, groups: dict, phase: str) -> None:
+        """Freeze the inactive group so grads (and updates) only reach the active one."""
+        if groups["cur"] == phase:
+            return
+        train_bb = phase == "backbone"
+        for p in groups["backbone"]:
+            p.requires_grad_(train_bb)
+        for p in groups["expert"]:
+            p.requires_grad_(not train_bb)
+        groups["cur"] = phase
+
     def _loader(self, ds: SoftMoEDataset, train: bool):
         bs = int(self.tcfg.get("batch_size", 8))
         pad = int(self.cfg.get_path("data.pad_token_id", 0) or 0)
@@ -80,9 +137,17 @@ class EMTrainer:
         (self.run_dir / "git_sha.txt").write_text(git_sha() + "\n")
 
         model.to(self.device)
-        opt, sched = self._build_optim(model)
-        ckpt = CheckpointManager(self.run_dir, keep_last=int(self.tcfg.get("keep_last", 1)))
         max_steps = int(self.tcfg.get("max_steps", 100))
+        alt = dict(self.tcfg.get("alternation", {}))
+        use_alt = bool(alt.get("enabled", False))
+        if use_alt:
+            groups = self._build_alternating(model, max_steps, alt)
+            opt = sched = None
+        else:
+            groups = None
+            opt, sched = self._build_optim(model)
+
+        ckpt = CheckpointManager(self.run_dir, keep_last=int(self.tcfg.get("keep_last", 1)))
         accum = int(self.tcfg.get("grad_accum", 1))
         clip = float(self.tcfg.get("grad_clip", 1.0))
         eval_every = int(self.tcfg.get("eval_every", max(1, max_steps // 4)))
@@ -95,24 +160,42 @@ class EMTrainer:
         loader = self._loader(train_ds, train=True)
         data_iter = _cycle(loader)
         model.train()
-        opt.zero_grad()
-        logger.info("[train] %d steps on %s | trainable params: %d",
-                    max_steps, self.device, sum(p.numel() for p in model.parameters() if p.requires_grad))
+        logger.info("[train] %d steps on %s | mode: %s | trainable params: %d",
+                    max_steps, self.device, "alternating θ⇄tokens" if use_alt else "joint",
+                    sum(p.numel() for p in model.parameters() if p.requires_grad))
 
         for step in range(1, max_steps + 1):
             if reassign_every and step % reassign_every == 0 and isinstance(model, SoftMoE):
                 self._nll_reassign(model, train_ds, opt, em, step)
+
+            phase = None
+            if use_alt:
+                phase = self._phase_for_step(step, groups["bb_steps"], groups["tok_steps"], groups["start"])
+                self._set_phase(groups, phase)
 
             batch = self._to_device(next(data_iter))
             out = model(batch, em_hard=em_hard)
             total, logs = combine_losses(out, lambdas)
             (total / accum).backward()
             if step % accum == 0:
-                torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], clip)
-                opt.step(); sched.step(); opt.zero_grad()
+                if use_alt:
+                    active_opt = groups["opt_bb"] if phase == "backbone" else groups["opt_tok"]
+                    active_sched = groups["sched_bb"] if phase == "backbone" else groups["sched_tok"]
+                    torch.nn.utils.clip_grad_norm_(
+                        groups["backbone"] if phase == "backbone" else groups["expert"], clip)
+                    active_opt.step(); active_sched.step()
+                    groups["opt_bb"].zero_grad(); groups["opt_tok"].zero_grad()
+                    logs["phase"] = phase
+                    logs["lr"] = active_sched.get_last_lr()[0]
+                else:
+                    torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], clip)
+                    opt.step(); sched.step(); opt.zero_grad()
 
             if step % log_every == 0 or step == 1:
-                logs["lr"] = sched.get_last_lr()[0]
+                if not use_alt:
+                    logs["lr"] = sched.get_last_lr()[0]
+                elif "phase" not in logs:
+                    logs["phase"] = phase
                 util = self._utilization(out)
                 if util is not None:
                     logs["dead_experts"] = int((util == 0).sum())
@@ -123,10 +206,11 @@ class EMTrainer:
                 val_ppl = self.validate(model, val_ds, em_hard)
                 self.metric_logger.log({"val_ppl": val_ppl}, step=step)
                 logger.info("[step %d] val_ppl=%.3f", step, val_ppl)
-                ckpt.save(model, opt, sched, step, metric=val_ppl)
+                ckpt.save(model, None if use_alt else opt, None if use_alt else sched, step, metric=val_ppl)
 
         if val_ds is None:
-            ckpt.save(model, opt, sched, max_steps, metric=None, is_best=True)
+            ckpt.save(model, None if use_alt else opt, None if use_alt else sched, max_steps,
+                      metric=None, is_best=True)
         self.metric_logger.close()
         return ckpt
 

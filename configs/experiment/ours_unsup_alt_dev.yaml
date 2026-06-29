@@ -1,0 +1,13 @@
+# M7: Ours (unsupervised) with the ALTERNATING M-step — train the LLM, then the expert tokens,
+# alternating. Backbone is trainable (full), unlike the frozen-backbone ours_unsup_dev.
+defaults: [/data/dev, /model/backbone_pythia160m, /train/em_alternate, /eval/default]
+meta: { name: ours_unsup_alt_dev, regime: ours_unsup_alt }
+data: { tokenizer: EleutherAI/pythia-160m }
+model:
+  method: softmoe
+  backbone_mode: full
+  injection: prefix
+  expert_tokens: { n_experts: auto, tokens_per_expert: 4, init: from_cluster_centroids, trainable: true }
+  router: { kind: soft, top_k: 1, pool: meanhidden }
+  router_supervise_with: cluster
+seed: 0
