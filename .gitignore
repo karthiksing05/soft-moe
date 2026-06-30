@@ -106,6 +106,9 @@ outputs/
 # Reports live under a single tracked `reports/` folder. Ephemeral default-run dumps go to
 # reports/latest/ (gitignored); curated, committed run reports live in reports/<run>/.
 /reports/latest/
+# Legacy/scratch singular `report/` is never used by the repo — guard against it reappearing
+# (e.g. from an ad-hoc pull) so it can't be committed. Use reports/<run>/ instead.
+/report/
 
 # Claude Code local session state (shared commands/skills/settings.json stay tracked)
 .claude/settings.local.json
