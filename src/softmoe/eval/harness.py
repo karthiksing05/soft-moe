@@ -78,6 +78,9 @@ def run_eval(model, processed_dir, cfg, device: str = "cpu") -> dict:
     # Total params actually updated under this config (frozen backbone ⇒ just tokens/router;
     # full/alternating ⇒ includes the backbone). Distinct from "added over a dense backbone".
     metrics["trainable_params"] = int(sum(p.numel() for p in model.parameters() if p.requires_grad))
+    # Params touched per token (active compute): for top-k MoE the inactive experts don't run.
+    # This is the axis of the compute-matched MoE comparison.
+    metrics["active_params"] = int(getattr(model, "num_active_params", lambda: metrics["total_params"])())
     return metrics
 
 

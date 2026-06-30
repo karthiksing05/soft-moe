@@ -153,3 +153,13 @@ class HardMoE(nn.Module):
             one_expert = sum(p.numel() for p in m.experts[0].parameters())
             extra += total - one_expert
         return extra
+
+    def num_active_params(self) -> int:
+        # Per-token compute: only top_k experts run, so the other (K - top_k) experts per
+        # layer are inactive. This is the basis of the compute-matched MoE comparison.
+        total = sum(p.numel() for p in self.parameters())
+        inactive = 0
+        for m in self.moe_layers:
+            per_expert = sum(p.numel() for p in m.experts[0].parameters())
+            inactive += (m.n_experts - m.top_k) * per_expert
+        return total - inactive

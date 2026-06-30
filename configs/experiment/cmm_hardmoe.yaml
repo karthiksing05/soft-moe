@@ -1,0 +1,12 @@
+# Hard-MoE: 5 experts (width 256) top-1 routing. ~Dense-1x active compute, ~Dense-5x FFN capacity.
+# NOT upcycled (from scratch). Switch load-balance aux on to prevent expert collapse.
+defaults: [/data/dev_bytes, /train/from_scratch, /eval/default]
+meta: { name: cmm_hardmoe, regime: hard_moe }
+model:
+  method: hard_moe
+  backbone_mode: full
+  backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 256, n_positions: 512 } }
+  hard_moe: { n_experts: 5, top_k: 1, upcycle: false }
+  load_balance_kind: switch
+train: { lambdas: { sep: 0.0, balance: 0.05, route: 0.0 } }
+seed: 0

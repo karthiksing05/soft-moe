@@ -74,3 +74,7 @@ class CBTM(nn.Module):
         # All but the first model count as "added" relative to a single dense backbone.
         per = sum(p.numel() for p in self.experts[0].parameters())
         return per * (self.n_experts - 1)
+
+    def num_active_params(self) -> int:
+        # Only one expert model runs per input.
+        return sum(p.numel() for p in self.experts[0].parameters())

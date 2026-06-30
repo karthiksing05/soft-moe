@@ -27,6 +27,8 @@ _COLUMNS = [
     ("swap_ratio", "swap-ratio ↑"),
     ("added_params", "+params (over dense) ↓"),
     ("trainable_params", "total-trainable ↓"),
+    ("active_params", "active/token ↓"),
+    ("total_params", "total ↓"),
 ]
 
 
@@ -47,6 +49,8 @@ def _row_from_metrics(m: dict) -> dict:
         "swap_ratio": swap.get("swap_ratio", float("nan")),
         "added_params": m.get("added_trainable_params", 0),
         "trainable_params": m.get("trainable_params", m.get("total_params", 0)),
+        "active_params": m.get("active_params", m.get("total_params", 0)),
+        "total_params": m.get("total_params", 0),
     }
 
 

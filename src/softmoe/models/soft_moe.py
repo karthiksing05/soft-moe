@@ -182,3 +182,12 @@ class SoftMoE(nn.Module):
             n += sum(p.numel() for p in self.prefix_encoder.parameters() if p.requires_grad)
         n += sum(p.numel() for p in self.router.parameters() if p.requires_grad)
         return n
+
+    def num_active_params(self) -> int:
+        # Full backbone + router + one expert's worth of tokens (prefix encoder if prefix_kv).
+        n = sum(p.numel() for p in self.backbone.parameters())
+        n += sum(p.numel() for p in self.router.parameters())
+        n += self.tokens.embeddings[0].numel()              # one expert active per input
+        if self.prefix_encoder is not None:
+            n += sum(p.numel() for p in self.prefix_encoder.parameters())
+        return n

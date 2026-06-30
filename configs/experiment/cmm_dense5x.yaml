@@ -1,0 +1,5 @@
+# Dense-5x: 5x-wider FFN (width 1280). The capacity ceiling, but ~5x the active FFN compute.
+defaults: [/data/dev_bytes, /train/from_scratch, /eval/default]
+meta: { name: cmm_dense5x, regime: dense_5x }
+model: { method: dense, backbone_mode: full, backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 1280, n_positions: 512 } } }
+seed: 0

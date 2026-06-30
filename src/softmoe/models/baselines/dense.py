@@ -25,3 +25,6 @@ class Dense(nn.Module):
 
     def num_added_trainable_params(self) -> int:
         return 0
+
+    def num_active_params(self) -> int:
+        return sum(p.numel() for p in self.parameters())

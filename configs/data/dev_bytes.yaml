@@ -1,0 +1,16 @@
+# Byte-level multi-domain corpus for the from-scratch, compute-matched MoE test (nanoGPT-style).
+# Same 5 distinct domains as dev, but tokenized as raw bytes (vocab 257) so models train from
+# scratch and capacity/interference — not pretrained knowledge — drives the result.
+data:
+  recipe: dev_bytes
+  block_size: 512
+  tokenizer: bytes
+  embedding_method: tfidf
+  clusterer: { kind: kmeans, n_clusters: 5 }
+  domains:
+    - { name: wiki,    source: hf, hf_path: wikitext,                  hf_config: wikitext-103-raw-v1, split: train, text_field: text,     max_docs: 6000, min_chars: 200 }
+    - { name: news,    source: hf, hf_path: ag_news,                                                  split: train, text_field: text,     max_docs: 6000, min_chars: 64  }
+    - { name: reviews, source: hf, hf_path: imdb,                                                     split: train, text_field: text,     max_docs: 6000, min_chars: 200 }
+    - { name: arxiv,   source: hf, hf_path: ccdv/arxiv-summarization,                                 split: train, text_field: abstract, max_docs: 6000, min_chars: 200 }
+    - { name: pubmed,  source: hf, hf_path: ccdv/pubmed-summarization,                                split: train, text_field: abstract, max_docs: 6000, min_chars: 200 }
+  splits: { train: 0.9, val: 0.05, test: 0.05 }
