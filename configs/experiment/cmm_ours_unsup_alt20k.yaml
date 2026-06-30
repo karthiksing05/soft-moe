@@ -1,6 +1,6 @@
 # Ours (unsup, alternating) at Dense-1x compute: small backbone + EM-discovered expert tokens.
 defaults: [/data/dev_bytes, /train/from_scratch_alt, /eval/default]
-meta: { name: cmm_ours_unsup_alt20k, regime: ours_unsup_alt }
+meta: { name: cmm_ours_unsup_alt20k, regime: ours_unsup_alt20k }
 model:
   method: softmoe
   backbone_mode: full
