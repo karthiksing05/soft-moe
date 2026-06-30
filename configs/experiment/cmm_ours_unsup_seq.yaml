@@ -1,8 +1,6 @@
-# Ours, SEQUENTIAL regime (finetuning-analog): train the LLM on all data first (= dense-1x),
-# THEN freeze it and EM the expert tokens on the frozen base. T=1. Backbone loaded via
-# --init-backbone-from <dense1x run dir>; backbone_mode frozen so only tokens+router train.
+# Ours — UNSUPERVISED (learned soft router) + SEQUENTIAL regime (frozen trained base + token EM). T=1.
 defaults: [/data/dev_bytes, /train/token_em, /eval/default]
-meta: { name: cmm_ours_seq, regime: ours_seq }
+meta: { name: cmm_ours_unsup_seq, regime: ours_unsup_seq }
 model:
   method: softmoe
   backbone_mode: frozen
