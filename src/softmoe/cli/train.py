@@ -44,6 +44,9 @@ def main(argv=None) -> int:
     ap.add_argument("--device", default=None)
     ap.add_argument("--force-data", action="store_true")
     ap.add_argument("--no-eval", action="store_true")
+    ap.add_argument("--init-backbone-from", default=None,
+                    help="run dir (or checkpoint) to load backbone weights from before training "
+                         "(for the sequential 'train LLM, then EM tokens' regime)")
     ap.add_argument("--set", nargs="*", default=[])
     args = ap.parse_args(argv)
 
@@ -71,6 +74,11 @@ def main(argv=None) -> int:
         centroids = _load_centroids(paths)
     model = build_model(cfg, vocab_size=vocab, data_n_experts=n_clusters, centroids=centroids)
 
+    # --- optional: load a pretrained backbone (sequential "train LLM, then EM tokens") ----
+    init_from = args.init_backbone_from or cfg.get_path("model.init_backbone_from")
+    if init_from:
+        _load_backbone_weights(model, init_from)
+
     # --- train -----------------------------------------------------------------------
     trainer = EMTrainer(cfg, run_dir, device=args.device)
     trainer.fit(model, train_ds, val_ds)
@@ -88,6 +96,27 @@ def _pad_id(tokenizer_name: str) -> int:
     tok = build_tokenizer(tokenizer_name)
     pad = getattr(tok, "pad_token_id", None)
     return int(pad) if pad is not None else 0
+
+
+def _load_backbone_weights(model, init_from: str) -> None:
+    """Copy ``backbone.*`` weights from a trained run into ``model`` (sequential regime).
+
+    ``init_from`` is a run dir (uses ``checkpoints/best.pt``) or a direct .pt path. Both Dense and
+    SoftMoE store the LM under ``self.backbone``, so the backbone keys line up.
+    """
+    import torch
+
+    path = Path(init_from)
+    ckpt = path / "checkpoints" / "best.pt" if path.is_dir() else path
+    if not ckpt.exists():
+        raise FileNotFoundError(f"--init-backbone-from: no checkpoint at {ckpt}")
+    state = torch.load(ckpt, map_location="cpu", weights_only=False)["model"]
+    bb = {k: v for k, v in state.items() if k.startswith("backbone.")}
+    if not bb:
+        raise ValueError(f"No 'backbone.*' weights found in {ckpt}.")
+    missing, unexpected = model.load_state_dict(bb, strict=False)
+    loaded = len(bb) - len([k for k in bb if k in unexpected])
+    logger.info("[init] loaded %d backbone tensors from %s (frozen base for token EM)", loaded, ckpt)
 
 
 if __name__ == "__main__":

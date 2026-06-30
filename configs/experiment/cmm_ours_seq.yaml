@@ -1,0 +1,14 @@
+# Ours, SEQUENTIAL regime (finetuning-analog): train the LLM on all data first (= dense-1x),
+# THEN freeze it and EM the expert tokens on the frozen base. T=1. Backbone loaded via
+# --init-backbone-from <dense1x run dir>; backbone_mode frozen so only tokens+router train.
+defaults: [/data/dev_bytes, /train/token_em, /eval/default]
+meta: { name: cmm_ours_seq, regime: ours_seq }
+model:
+  method: softmoe
+  backbone_mode: frozen
+  injection: prefix
+  backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 256, n_positions: 576 } }
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: from_cluster_centroids, trainable: true }
+  router: { kind: soft, top_k: 1, pool: meanhidden }
+  router_supervise_with: cluster
+seed: 0

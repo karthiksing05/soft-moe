@@ -1,5 +1,5 @@
-# Dense-1x: small FFN (width 256). The capacity-limited baseline (active = total).
+# Dense-1x: small FFN (width 256). Capacity-limited baseline AND the trained base for ours-seq.
 defaults: [/data/dev_bytes, /train/from_scratch, /eval/default]
 meta: { name: cmm_dense1x, regime: dense_1x }
-model: { method: dense, backbone_mode: full, backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 256, n_positions: 512 } } }
+model: { method: dense, backbone_mode: full, backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 256, n_positions: 576 } } }
 seed: 0

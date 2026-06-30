@@ -1,13 +1,14 @@
-# Ours (unsup, alternating) at Dense-1x compute: small backbone + EM-discovered expert tokens.
+# Ours, ALTERNATING regime (thesis Phase A<->B repeated): backbone <-> token blocks. T=1.
+# 20k steps so the backbone gets ~15k updates (matched to dense-1x's budget).
 defaults: [/data/dev_bytes, /train/from_scratch_alt, /eval/default]
-meta: { name: cmm_ours_unsup_alt20k, regime: ours_unsup_alt20k }
+meta: { name: cmm_ours_alt, regime: ours_alt }
 model:
   method: softmoe
   backbone_mode: full
   injection: prefix
   backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 256, n_positions: 576 } }
-  expert_tokens: { n_experts: auto, tokens_per_expert: 4, init: from_cluster_centroids, trainable: true }
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: from_cluster_centroids, trainable: true }
   router: { kind: soft, top_k: 1, pool: meanhidden }
   router_supervise_with: cluster
-seed: 0
 train: { max_steps: 20000 }
+seed: 0
