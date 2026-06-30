@@ -20,13 +20,13 @@ Perplexity of each **domain** (row) routed through each **expert** (column). `*`
 
 | domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | self-ppl | other-mean | ×worse |
 |---|---|---|---|---|---|---|---|---|
-| wiki | 4.0 | 4.0 | 4.0 | **4.0*** | 4.0 | 4.0 | 4.0 | 1.01× |
-| news | 4.6 | 4.6* | 4.6 | **4.6** | 4.6 | 4.6 | 4.6 | 1.00× |
-| reviews | 3.9 | 3.8 | 3.9 | 3.8 | **3.8*** | 3.8 | 3.9 | 1.01× |
-| arxiv | **3.0*** | 3.1 | 3.0 | 3.1 | 3.1 | 3.0 | 3.1 | 1.02× |
-| pubmed | 3.3 | 3.4 | **3.3*** | 3.4 | 3.4 | 3.3 | 3.4 | 1.02× |
+| wiki | 4.0 | 3.9 | 4.0 | **3.9*** | 4.0 | 3.9 | 4.0 | 1.02× |
+| news | 4.6 | **4.5*** | 4.6 | 4.5 | 4.6 | 4.5 | 4.6 | 1.02× |
+| reviews | 3.9 | 3.9 | 3.9 | 3.8 | **3.8*** | 3.8 | 3.9 | 1.02× |
+| arxiv | **3.0*** | 3.3 | 3.0 | 3.2 | 3.3 | 3.0 | 3.2 | 1.06× |
+| pubmed | 3.3 | 3.6 | **3.3*** | 3.5 | 3.7 | 3.3 | 3.5 | 1.08× |
 
-**Summary:** mean self-expert ppl 3.7 vs mean other-expert ppl 3.8 → **1.01× worse** through the wrong expert; lowest-ppl expert is the matched one for **80%** of domains.
+**Summary:** mean self-expert ppl 3.7 vs mean other-expert ppl 3.8 → **1.04× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
 
 ### ours_sup_alt
 
@@ -48,10 +48,10 @@ Perplexity of each **domain** (row) routed through each **expert** (column). `*`
 
 | domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | self-ppl | other-mean | ×worse |
 |---|---|---|---|---|---|---|---|---|
-| wiki | **4.0*** | 4.0 | 4.1 | 4.0 | 4.0 | 4.0 | 4.0 | 1.01× |
-| news | 4.6 | **4.6*** | 4.6 | 4.6 | 4.6 | 4.6 | 4.6 | 1.00× |
-| reviews | 3.8 | 3.8 | **3.8*** | 3.9 | 3.9 | 3.8 | 3.9 | 1.01× |
-| arxiv | 3.1 | 3.0 | 3.1 | **3.0*** | 3.1 | 3.0 | 3.1 | 1.02× |
-| pubmed | 3.4 | 3.3 | 3.5 | 3.4 | **3.3*** | 3.3 | 3.4 | 1.03× |
+| wiki | **3.9*** | 4.3 | 4.3 | 4.0 | 4.0 | 3.9 | 4.1 | 1.06× |
+| news | 4.5 | **4.5*** | 4.6 | 4.7 | 4.6 | 4.5 | 4.6 | 1.04× |
+| reviews | 3.9 | 3.9 | **3.8*** | 4.0 | 3.9 | 3.8 | 3.9 | 1.04× |
+| arxiv | 3.3 | 3.5 | 3.5 | **3.0*** | 3.1 | 3.0 | 3.3 | 1.12× |
+| pubmed | 3.6 | 3.9 | 4.1 | 3.4 | **3.3*** | 3.3 | 3.7 | 1.15× |
 
-**Summary:** mean self-expert ppl 3.7 vs mean other-expert ppl 3.8 → **1.01× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
+**Summary:** mean self-expert ppl 3.7 vs mean other-expert ppl 3.9 → **1.08× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
