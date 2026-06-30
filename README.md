@@ -73,6 +73,24 @@ Every method exposes the same `forward(batch) -> {loss, logits, per_example_nll,
 `train.py` / `evaluate.py` are method-agnostic and a run is fully described by one
 `configs/experiment/*.yaml`.
 
+## Core experiment — [`reports/cmm/`](reports/cmm/)
+
+The repo's **core experiment** is the compute-matched MoE-validation test: a from-scratch,
+byte-level, multi-domain LM comparison (Jacobs 1991 / DEMix / c-BTM lineage) at **matched active
+compute**, which (a) reproduces the known MoE advantage (an oracle-routed MoE reaches a 5×-wider
+dense model's quality at the small model's per-token cost) and (b) tests whether our EM-discovered
+expert tokens share it. It compares the baselines (Dense-1×, Dense-5×, Hard-MoE learned + oracle)
+against our method under its three **training regimes**:
+
+- **frozen** — backbone fixed, only tokens + router learn (param-light; `configs/train/em_soft.yaml`);
+- **alternating** — repeated backbone⇄token blocks (the thesis's Phase A⇄B; `em_alternate.yaml`);
+- **sequential** — train the LLM on all data first, *then* freeze it and EM the tokens — a
+  finetuning-analog (`token_em.yaml` + `--init-backbone-from`; `cmm_ours_seq.yaml`).
+
+Expert tokens default to **one vector per expert** (`tokens_per_expert: 1`), matching the persona-
+token regime in [`papers/master_thesis_stream_a.pdf`](papers/master_thesis_stream_a.pdf). The
+pretrained-backbone pilot lives in [`reports/m7-raven/`](reports/m7-raven/) as a secondary result.
+
 ## Scaling up (the headline run, M7)
 
 `configs/data/{dev,main}.yaml` and `configs/model/backbone_{gpt2,pythia160m}.yaml` swap in real
@@ -85,5 +103,5 @@ via the Claude Code HPC skills wired into this repo (see [`CLAUDE.md`](CLAUDE.md
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 27 hermetic tests, ~5s, no network
+.venv/bin/python -m pytest tests/ -q     # 32 hermetic tests, ~8s, no network
 ```
