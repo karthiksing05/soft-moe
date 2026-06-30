@@ -116,7 +116,7 @@ def _load_backbone_weights(model, init_from: str) -> None:
         raise ValueError(f"No 'backbone.*' weights found in {ckpt}.")
     missing, unexpected = model.load_state_dict(bb, strict=False)
     loaded = len(bb) - len([k for k in bb if k in unexpected])
-    logger.info("[init] loaded %d backbone tensors from %s (frozen base for token EM)", loaded, ckpt)
+    logger.info("[init] warm-started %d backbone tensors from %s", loaded, ckpt)
 
 
 if __name__ == "__main__":
