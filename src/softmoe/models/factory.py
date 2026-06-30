@@ -41,7 +41,8 @@ def build_model(cfg, *, vocab_size: int, data_n_experts: int, centroids=None):
         backbone = build_backbone({**backbone_cfg, "backbone_mode": "full"}, vocab_size)
         moe_cfg = model_cfg.get("hard_moe", {})
         return HardMoE(backbone, n_experts=int(moe_cfg.get("n_experts", 4)),
-                       top_k=int(moe_cfg.get("top_k", 1)), upcycle=bool(moe_cfg.get("upcycle", True)))
+                       top_k=int(moe_cfg.get("top_k", 1)), upcycle=bool(moe_cfg.get("upcycle", True)),
+                       route_by=moe_cfg.get("route_by", "learned"))
 
     if method == "cbtm":
         from softmoe.models.baselines.cbtm import CBTM

@@ -36,6 +36,7 @@ class MoEFFN(nn.Module):
              for _ in range(n_experts)]
         )
         self.last_aux: dict = {}
+        self.forced_ids: torch.Tensor | None = None    # [B] oracle expert per example (or None)
 
     @torch.no_grad()
     def upcycle_from(self, src_mlp: nn.Module) -> bool:
@@ -67,8 +68,14 @@ class MoEFFN(nn.Module):
         x = hidden_states.reshape(-1, d)                       # [N, d]
         logits = self.gate(x)                                  # [N, K]
         probs = F.softmax(logits, dim=-1)
-        topw, topi = probs.topk(self.top_k, dim=-1)            # [N, k]
-        topw = topw / topw.sum(dim=-1, keepdim=True).clamp(min=1e-9)
+        if self.forced_ids is not None:
+            # Oracle routing: every token of example b goes to expert forced_ids[b] (DEMix-style).
+            ids = self.forced_ids.clamp(max=self.n_experts - 1).view(B, 1).expand(B, L).reshape(-1)
+            topi = ids.unsqueeze(-1)                            # [N, 1]
+            topw = torch.ones_like(topi, dtype=x.dtype)
+        else:
+            topw, topi = probs.topk(self.top_k, dim=-1)        # [N, k]
+            topw = topw / topw.sum(dim=-1, keepdim=True).clamp(min=1e-9)
 
         out = torch.zeros_like(x)
         for j in range(self.top_k):
@@ -88,10 +95,12 @@ class MoEFFN(nn.Module):
 
 
 class HardMoE(nn.Module):
-    def __init__(self, backbone, n_experts: int = 4, top_k: int = 1, upcycle: bool = True):
+    def __init__(self, backbone, n_experts: int = 4, top_k: int = 1, upcycle: bool = True,
+                 route_by: str = "learned"):
         super().__init__()
         self.backbone = backbone
         self.n_experts = n_experts
+        self.route_by = route_by              # 'learned' (token-routed) | 'domain' | 'cluster' (oracle)
         self.moe_layers: list[MoEFFN] = []
         self._inject(n_experts, top_k, upcycle)
 
@@ -135,7 +144,15 @@ class HardMoE(nn.Module):
         raise AttributeError("HardMoE: could not locate transformer blocks on this backbone.")
 
     def forward(self, batch, em_hard: bool = False) -> dict:
+        # Oracle routing: pin every layer's expert to the input's domain/cluster (DEMix-style).
+        if self.route_by in ("domain", "cluster"):
+            key = "domain_id" if self.route_by == "domain" else "cluster_id"
+            ids = batch[key]
+            for m in self.moe_layers:
+                m.forced_ids = ids
         out = self.backbone(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+        for m in self.moe_layers:
+            m.forced_ids = None
         per_ex = causal_lm_loss(out.logits, batch["labels"], reduction="per_example")
         aux_balance = sum(m.last_aux.get("raw_aux", 0.0) for m in self.moe_layers)
         return {
