@@ -65,8 +65,8 @@ Ours (fixed)      |             |             |                   |             
 Ours (sup.)       |             |             |                   |                |       |
 Ours (unsup.)     |             |             |                   |                |       |
 ```
-Output both `report/main_table.md` and machine-readable `report/results.csv`, plus plots
-(matplotlib, saved to `report/figures/`):
+Output both `reports/main/main_table.md` and machine-readable `reports/main/results.csv`, plus
+plots (matplotlib, saved to `reports/main/figures/`):
 1. quality (macro-ppl) vs added trainable params,
 2. expert×domain contingency heatmap per method,
 3. utilization histograms,
@@ -97,7 +97,7 @@ Each is a sweep over one config knob; `make_report.py` should render each as its
 ## 7. Deliverables / acceptance
 
 - **M6:** `python scripts/evaluate.py --run experiments/<run>` writes `metrics.json` with every
-  metric in §2–§3; `python scripts/make_report.py --runs experiments/ --out report/` emits
+  metric in §2–§3; `python scripts/make_report.py --runs experiments/ --out reports/main/` emits
   `main_table.md`, `results.csv`, and the figures.
 - `tests/test_metrics.py` checks metric math on synthetic cases (e.g. perfect routing → NMI=1,
   collapse → utilization-entropy=0, identical experts → separation=0).

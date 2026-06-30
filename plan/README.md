@@ -124,7 +124,7 @@ A single command sequence reproduces the paper's main table:
 ```bash
 python scripts/build_data.py    --config configs/data/main.yaml
 python scripts/train.py         --config configs/experiment/<method>.yaml   # for each method
-python scripts/make_report.py   --runs experiments/ --out report/main_table.md
+python scripts/make_report.py   --runs experiments/ --out reports/main
 ```
 The table reports per-domain and average perplexity plus specialization metrics for all six
 methods, in both supervised and unsupervised regimes where applicable.
