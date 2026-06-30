@@ -1,9 +1,10 @@
-# Ours — SUPERVISED (route by ground-truth domain) + SEQUENTIAL regime (frozen trained base). T=1.
-defaults: [/data/dev_bytes, /train/token_em, /eval/default]
+# Ours — SUPERVISED + SEQUENTIAL(=pretrain-then-ALTERNATE). Train the LLM fully first (dense1x),
+# then warm-start it and run the alternating scheme to converge the tokens (backbone co-adapts). T=1.
+defaults: [/data/dev_bytes, /train/warm_alt, /eval/default]
 meta: { name: cmm_ours_sup_seq, regime: ours_sup_seq }
 model:
   method: softmoe
-  backbone_mode: frozen
+  backbone_mode: full
   injection: prefix
   backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 256, n_positions: 576 } }
   expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: from_cluster_centroids, trainable: true }

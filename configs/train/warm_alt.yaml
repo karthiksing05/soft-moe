@@ -1,0 +1,22 @@
+# Stage 2 of the sequential regime: the backbone is already trained (warm-started via
+# --init-backbone-from); now run the ALTERNATING scheme to converge the tokens while the backbone
+# gently co-adapts. Two-timescale LRs (small backbone, high token), starting on the tokens.
+train:
+  max_steps: 10000
+  batch_size: 16
+  grad_accum: 1
+  grad_clip: 1.0
+  eval_every: 2500
+  log_every: 500
+  keep_last: 1
+  em: { mode: soft, reassign_every: 0 }
+  lambdas: { sep: 1.0, balance: 0.1, route: 0.5 }
+  alternation:
+    enabled: true
+    start: tokens             # backbone is already trained; converge tokens first
+    backbone_steps: 200
+    token_steps: 200
+    backbone_lr: 5.0e-5        # gentle fine-tune of the pretrained base
+    token_lr: 1.0e-2
+  scheduler: cosine
+  wandb: { enabled: false }
