@@ -57,7 +57,7 @@ def analyze(runs: list[str]) -> dict:
             ablation[reg] = {"macro": r["macro"], "active": r["active"], "total": r["total"]}
 
     sizes = ["d128", "d256", "d384", "d512"]
-    models = ["dense", "moe_g1", "moe_g2"]
+    models = ["dense", "moe_g1", "moe_g2", "ours"]
     curve = {}
     for m in models:
         curve[m] = []
@@ -67,23 +67,30 @@ def analyze(runs: list[str]) -> dict:
                 curve[m].append({"size": s, "active": sweep_active.get((s, m)),
                                  "mean": float(np.mean(vals)), "std": float(np.std(vals)),
                                  "n": len(vals)})
-    # gap = dense - moe_g2 per size
+    # gap over dense, per size, for MoE-G2 and for ours (>0 = better than dense)
+    def _mean(s, m):
+        vs = [v for v in sweep.get(s, {}).get(m, []) if v is not None]
+        return float(np.mean(vs)) if vs else None
     gap = []
     for s in sizes:
-        d = [v for v in sweep.get(s, {}).get("dense", []) if v is not None]
-        g2 = [v for v in sweep.get(s, {}).get("moe_g2", []) if v is not None]
-        if d and g2:
-            gap.append({"size": s, "active": sweep_active.get((s, "dense")),
-                        "dense": float(np.mean(d)), "moe_g2": float(np.mean(g2)),
-                        "gap": float(np.mean(d) - np.mean(g2))})
+        d = _mean(s, "dense")
+        if d is None:
+            continue
+        g2, ou = _mean(s, "moe_g2"), _mean(s, "ours")
+        row = {"size": s, "active": sweep_active.get((s, "dense")), "dense": d}
+        if g2 is not None:
+            row["moe_g2"] = g2; row["gap"] = d - g2
+        if ou is not None:
+            row["ours"] = ou; row["gap_ours"] = d - ou
+        gap.append(row)
     return {"curve": curve, "gap": gap, "ablation": ablation, "sizes": sizes}
 
 
 def render_markdown(report: dict) -> str:
     L = ["# isoFLOP scaling sweep & ablations", ""]
     L += ["## Scaling curves (macro-ppl ↓, mean±std over seeds)", "",
-          "| size | active | dense | MoE-G1 (coarse) | MoE-G2 (fine) | dense−G2 gap |",
-          "|---|---|---|---|---|---|"]
+          "| size | active | dense | MoE-G1 (coarse) | MoE-G2 (fine) | ours (sup) | dense−G2 | dense−ours |",
+          "|---|---|---|---|---|---|---|---|"]
     gap_by_size = {g["size"]: g for g in report["gap"]}
     for s in report["sizes"]:
         def cell(m):
@@ -95,15 +102,21 @@ def render_markdown(report: dict) -> str:
         dcell, active = cell("dense")
         g1cell, _ = cell("moe_g1")
         g2cell, _ = cell("moe_g2")
-        gp = gap_by_size.get(s, {}).get("gap")
-        gps = f"{gp:+.3f}" if gp is not None else "—"
+        oucell, _ = cell("ours")
+        g = gap_by_size.get(s, {})
+        gp = f"{g['gap']:+.3f}" if g.get("gap") is not None else "—"
+        gpo = f"{g['gap_ours']:+.3f}" if g.get("gap_ours") is not None else "—"
         act = f"{active/1e6:.1f}M" if active else "—"
-        L.append(f"| {s} | {act} | {dcell} | {g1cell} | {g2cell} | {gps} |")
+        L.append(f"| {s} | {act} | {dcell} | {g1cell} | {g2cell} | {oucell} | {gp} | {gpo} |")
 
-    L += ["", "## Gap trend (does the fine-grained MoE advantage widen with scale? — H1/H2)", ""]
+    L += ["", "## Gap-over-dense trend (does the advantage widen with scale? — H1/H2)", ""]
     for g in report["gap"]:
-        L.append(f"- **{g['size']}** ({g['active']/1e6:.1f}M active): dense {g['dense']:.3f} − "
-                 f"MoE-G2 {g['moe_g2']:.3f} = **{g['gap']:+.3f}**")
+        parts = [f"**{g['size']}** ({g['active']/1e6:.1f}M active): dense {g['dense']:.3f}"]
+        if g.get("gap") is not None:
+            parts.append(f"MoE-G2 {g['moe_g2']:.3f} (gap **{g['gap']:+.3f}**)")
+        if g.get("gap_ours") is not None:
+            parts.append(f"ours {g['ours']:.3f} (gap **{g['gap_ours']:+.3f}**)")
+        L.append("- " + " · ".join(parts))
 
     if report["ablation"]:
         L += ["", "## Ablation matrix (d256, 20k steps, single seed)", "",
@@ -124,7 +137,7 @@ def make_plots(report: dict, out_dir: Path) -> None:
     # 1. scaling curves
     fig, ax = plt.subplots()
     for m, label, mk in [("dense", "Dense", "o"), ("moe_g1", "MoE-G1 coarse", "s"),
-                          ("moe_g2", "MoE-G2 fine", "^")]:
+                          ("moe_g2", "MoE-G2 fine", "^"), ("ours", "ours (sup)", "D")]:
         pts = [c for c in report["curve"].get(m, []) if c["active"]]
         if pts:
             xs = [p["active"] / 1e6 for p in pts]
@@ -135,14 +148,19 @@ def make_plots(report: dict, out_dir: Path) -> None:
     ax.set_title("isoFLOP scaling: dense vs coarse vs fine MoE"); ax.legend()
     fig.savefig(out_dir / "scaling_curves.png", dpi=120, bbox_inches="tight"); plt.close(fig)
 
-    # 2. gap vs scale
+    # 2. gap vs scale — MoE-G2 and ours, both vs dense
     if report["gap"]:
         fig, ax = plt.subplots()
-        xs = [g["active"] / 1e6 for g in report["gap"]]
-        ys = [g["gap"] for g in report["gap"]]
-        ax.plot(xs, ys, "o-", color="tab:green")
+        g2 = [g for g in report["gap"] if g.get("gap") is not None]
+        ou = [g for g in report["gap"] if g.get("gap_ours") is not None]
+        if g2:
+            ax.plot([g["active"] / 1e6 for g in g2], [g["gap"] for g in g2], "^-",
+                    color="tab:red", label="MoE-G2 (fine)")
+        if ou:
+            ax.plot([g["active"] / 1e6 for g in ou], [g["gap_ours"] for g in ou], "D-",
+                    color="tab:blue", label="ours (sup)")
         ax.axhline(0, color="gray", ls="--", lw=0.8)
         ax.set_xscale("log"); ax.set_xlabel("active params (M, log)")
-        ax.set_ylabel("dense − MoE-G2 (ppl; >0 = MoE better)")
-        ax.set_title("Fine-grained MoE advantage vs scale (H1/H2)")
+        ax.set_ylabel("advantage over dense (ppl; >0 = better)")
+        ax.set_title("Advantage over dense vs scale (H1/H2)"); ax.legend()
         fig.savefig(out_dir / "gap_vs_scale.png", dpi=120, bbox_inches="tight"); plt.close(fig)
