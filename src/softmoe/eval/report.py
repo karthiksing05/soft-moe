@@ -95,6 +95,7 @@ def make_report(runs_dir: str | Path, out_dir: str | Path) -> dict:
     table = make_table(rows)
     (out_dir / "main_table.md").write_text("# Soft-MoE — comparison table\n\n" + table + "\n")
     _write_csv(rows, out_dir / "results.csv")
+    (out_dir / "per_domain_ppl.md").write_text(_per_domain_table(metrics))
 
     try:
         _make_figures(metrics, rows, fig_dir)
@@ -103,6 +104,31 @@ def make_report(runs_dir: str | Path, out_dir: str | Path) -> dict:
 
     logger.info("[report] wrote %s and %s", out_dir / "main_table.md", out_dir / "results.csv")
     return {"rows": rows, "table": table}
+
+
+def _per_domain_table(metrics: list[dict]) -> str:
+    """Per-domain perplexity for EVERY model (learned routing), rows=methods, cols=domains."""
+    names: list[str] = []
+    for m in metrics:
+        if m.get("domain_names"):
+            names = m["domain_names"]; break
+    if not names:
+        return "# Per-domain perplexity\n\n_(no domain names recorded)_\n"
+    lines = ["# Per-domain perplexity (learned routing, ↓)", "",
+             "| method | " + " | ".join(names) + " | macro |",
+             "|" + "---|" * (len(names) + 2)]
+    for m in metrics:
+        lm = m.get("lm_learned", {})
+        pd = lm.get("per_domain", {})
+        cells = []
+        for d in range(len(names)):
+            v = pd.get(str(d), pd.get(d))
+            cells.append(f"{v:.2f}" if isinstance(v, (int, float)) else "—")
+        macro = lm.get("macro_ppl")
+        macro_s = f"{macro:.2f}" if isinstance(macro, (int, float)) else "—"
+        label = m.get("regime") or m.get("method", "?")
+        lines.append(f"| {label} | " + " | ".join(cells) + f" | {macro_s} |")
+    return "\n".join(lines) + "\n"
 
 
 def _write_csv(rows: list[dict], path: Path) -> None:

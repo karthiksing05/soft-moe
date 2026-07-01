@@ -93,6 +93,12 @@ def combine_losses(out: dict, lambdas: dict) -> tuple[torch.Tensor, dict]:
         total = total + lambdas["route"] * route
         logs["route"] = float(route.detach())
 
+    # Router z-loss (ST-MoE) for the MoE arm; small coefficient (~1e-3).
+    z = aux.get("z_loss")
+    if z is not None and lambdas.get("z", 0.0) and torch.is_tensor(z):
+        total = total + lambdas["z"] * z
+        logs["z_loss"] = float(z.detach())
+
     logs["total"] = float(total.detach())
     if "utilization_entropy" in aux:
         logs["util_entropy"] = float(aux["utilization_entropy"])

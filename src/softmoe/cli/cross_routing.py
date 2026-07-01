@@ -23,19 +23,32 @@ from softmoe.utils.logging import get_logger
 logger = get_logger()
 
 
-def analyze_run(run_dir: str, data_root: str, device: str) -> tuple[dict | None, list[str], str]:
+def analyze_run(run_dir: str, data_root: str, device: str) -> tuple[str | None, str]:
+    """Return (markdown_section, regime). Dispatches to the right per-model domain analysis."""
+    from softmoe.models.baselines.hard_moe import HardMoE
+    from softmoe.eval.moe_analysis import moe_domain_utilization, render_markdown as moe_render
+
     model, cfg, paths = load_run_model(run_dir, data_root)
     regime = cfg.get_path("meta.regime") or cfg.get_path("model.method", "run")
-    if not isinstance(model, (SoftMoE, CBTM)):
-        logger.info("[cross-routing] %s has no per-document experts — skipping.", regime)
-        return None, [], regime
     with open(paths.domains) as fh:
         domain_names = list(json.load(fh)["domain_to_id"].keys())
     test = load_dataset_split(paths.root, "test")
     pad = int(cfg.get_path("data.pad_token_id", 0) or 0)
     bs = int(cfg.get_path("eval.batch_size", 8))
-    report = expert_domain_matrix(model, test, device=device, batch_size=bs, pad_token_id=pad)
-    return report, domain_names, regime
+
+    if isinstance(model, (SoftMoE, CBTM)):
+        rep = expert_domain_matrix(model, test, device=device, batch_size=bs, pad_token_id=pad)
+        s = rep["summary"]
+        logger.info("[routing] %-14s gap=%.2fx best-is-self=%.0f%%", regime,
+                    s["specialization_gap_ratio"], s["frac_domains_best_is_self"] * 100)
+        return render_markdown(rep, domain_names, regime), regime
+    if isinstance(model, HardMoE):
+        rep = moe_domain_utilization(model, test, device=device, batch_size=bs, pad_token_id=pad)
+        logger.info("[routing] %-14s MoE routing-NMI=%.3f dead=%d/%d", regime,
+                    rep["routing_nmi"], rep["dead_experts"], rep["n_routed"])
+        return moe_render(rep, domain_names, regime), regime
+    logger.info("[routing] %s has no experts — per-domain ppl is in the main table.", regime)
+    return None, regime
 
 
 def main(argv=None) -> int:
@@ -47,24 +60,20 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    md_sections = ["# Expert × domain cross-routing\n"]
-    all_json = {}
+    md_sections = ["# Domain routing analysis (every model)\n",
+                   "Per-model expert↔domain specialization: our expert-token methods show an "
+                   "expert×domain **perplexity** matrix (swap test); the MoE arm shows its learned "
+                   "expert×domain **token-routing** distribution + routing-NMI.\n"]
     for run in args.runs:
-        report, names, regime = analyze_run(run, args.data_root, device)
-        if report is None:
-            continue
-        md_sections.append(render_markdown(report, names, regime))
-        all_json[regime] = report
-        s = report["summary"]
-        logger.info("[cross-routing] %-12s gap=%.2fx best-is-self=%.0f%%", regime,
-                    s["specialization_gap_ratio"], s["frac_domains_best_is_self"] * 100)
+        section, regime = analyze_run(run, args.data_root, device)
+        if section is not None:
+            md_sections.append(section)
 
     md = "\n".join(md_sections)
     if args.out:
         out = Path(args.out); out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(md)
-        out.with_suffix(".json").write_text(json.dumps(all_json, indent=2))
-        print(f"wrote {out} and {out.with_suffix('.json')}")
+        print(f"wrote {out}")
     else:
         print(md)
     return 0

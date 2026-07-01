@@ -47,6 +47,11 @@ def run_eval(model, processed_dir, cfg, device: str = "cpu") -> dict:
     method = cfg.get_path("model.method", "softmoe")
 
     metrics: dict = {"method": method, "regime": cfg.get_path("meta.regime", method)}
+    try:
+        with open(Path(processed_dir) / "domains.json") as fh:
+            metrics["domain_names"] = list(json.load(fh)["domain_to_id"].keys())
+    except (FileNotFoundError, KeyError):
+        metrics["domain_names"] = []
 
     # --- LM quality: learned + oracle routing ----------------------------------------
     learned = per_domain_perplexity(model, test, device, "learned", bs, pad)

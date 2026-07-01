@@ -1,13 +1,20 @@
-"""Hard MoE baseline — classic top-k token-routed FFN MoE. The (parameter-heavy) upper bound.
+"""Hard MoE baseline — token-routed FFN MoE, built per SCALED_RECIPE.md.
 
-We replace the backbone's FFN blocks with a minimal from-scratch token-routed MoE FFN (not a
-full MoE library) and add the Switch-Transformer load-balance aux loss. Works on GPT-2-style
-(``transformer.h``) and GPT-NeoX/pythia-style (``gpt_neox.layers``) backbones.
+Recipe-faithful levers (all config-driven), so the MoE arm is not the understated textbook
+GShard/Switch config that was found to *saturate* (Clark et al. 2022), but the near-Pareto-optimal
+design of the fine-grained scaling-law line:
 
-Each expert is **sparse-upcycled** from the pretrained dense FFN (Komatsuzaki et al., 2023): the
-experts start as copies of the original FFN, so the MoE begins ≈ the pretrained model and *learns
-to specialize*, rather than relearning an FFN from scratch (which a few thousand steps can't do).
-This makes it a fair "true MoE" reference for the comparison.
+- **Fine-grained experts** (Krajewski/Ludziejewski et al. 2024): granularity ``G`` splits each base
+  expert's FFN into ``G`` pieces of width ``d_ff/G`` and routes to ``G×`` as many, holding active
+  compute constant while decomposing knowledge more finely. ``G=1`` reproduces coarse Switch/Mixtral.
+- **Shared experts** (DeepSeekMoE, Dai et al. 2024): ``n_shared`` always-on experts absorb common
+  knowledge so routed experts don't waste capacity re-learning it.
+- **Router z-loss** (ST-MoE, Zoph et al. 2022): penalizes ``logsumexp(router_logits)²`` for stability.
+- **Switch load-balancing aux loss** (Fedus et al. 2022): the ``K·Σ f_i·P_i`` term.
+- **top-k token-choice routing** (causal-safe).
+
+Also supports **oracle domain routing** (DEMix, Gururangan et al. 2021) via ``route_by=domain``, and
+**sparse upcycling** (Komatsuzaki et al. 2023) when expert width matches the dense FFN.
 """
 
 from __future__ import annotations
@@ -23,42 +30,43 @@ from softmoe.utils.logging import get_logger
 logger = get_logger()
 
 
-class MoEFFN(nn.Module):
-    """Top-k token-routed MoE feed-forward, drop-in for a transformer block's ``.mlp``."""
+def _ffn(d_model: int, width: int) -> nn.Sequential:
+    return nn.Sequential(nn.Linear(d_model, width), nn.GELU(), nn.Linear(width, d_model))
 
-    def __init__(self, d_model: int, d_inner: int, n_experts: int, top_k: int = 1):
+
+class MoEFFN(nn.Module):
+    """Fine-grained top-k token-routed MoE FFN (+ optional shared experts), drop-in for ``.mlp``."""
+
+    def __init__(self, d_model: int, expert_width: int, n_routed: int, top_k: int, n_shared: int = 0):
         super().__init__()
-        self.n_experts = n_experts
-        self.top_k = min(top_k, n_experts)
-        self.gate = nn.Linear(d_model, n_experts, bias=False)
-        self.experts = nn.ModuleList(
-            [nn.Sequential(nn.Linear(d_model, d_inner), nn.GELU(), nn.Linear(d_inner, d_model))
-             for _ in range(n_experts)]
-        )
+        self.n_experts = n_routed                         # routed (fine-grained) expert count
+        self.top_k = min(top_k, n_routed)
+        self.expert_width = expert_width
+        self.n_shared = n_shared
+        self.gate = nn.Linear(d_model, n_routed, bias=False)
+        self.experts = nn.ModuleList([_ffn(d_model, expert_width) for _ in range(n_routed)])
+        self.shared = nn.ModuleList([_ffn(d_model, expert_width) for _ in range(n_shared)])
         self.last_aux: dict = {}
-        self.forced_ids: torch.Tensor | None = None    # [B] oracle expert per example (or None)
+        self.capture: bool = False                        # record per-token routing for analysis
+        self.forced_ids: torch.Tensor | None = None       # [B] oracle expert per example (or None)
 
     @torch.no_grad()
     def upcycle_from(self, src_mlp: nn.Module) -> bool:
-        """Initialize every expert from the pretrained dense FFN. Returns True on success."""
-        w1 = b1 = w2 = b2 = None
-        # GPT-NeoX / pythia: dense_h_to_4h (Linear) -> act -> dense_4h_to_h (Linear)
+        """Copy the dense FFN into every routed expert (only when widths match; G=1 case)."""
         if hasattr(src_mlp, "dense_h_to_4h") and hasattr(src_mlp, "dense_4h_to_h"):
             w1, b1 = src_mlp.dense_h_to_4h.weight, src_mlp.dense_h_to_4h.bias
             w2, b2 = src_mlp.dense_4h_to_h.weight, src_mlp.dense_4h_to_h.bias
-        # GPT-2: c_fc (Conv1D) -> act -> c_proj (Conv1D); Conv1D weight is transposed vs Linear
         elif hasattr(src_mlp, "c_fc") and hasattr(src_mlp, "c_proj"):
             w1, b1 = src_mlp.c_fc.weight.t(), src_mlp.c_fc.bias
             w2, b2 = src_mlp.c_proj.weight.t(), src_mlp.c_proj.bias
         else:
             return False
         try:
-            for expert in self.experts:
-                if expert[0].weight.shape == w1.shape and expert[2].weight.shape == w2.shape:
-                    expert[0].weight.copy_(w1); expert[0].bias.copy_(b1)
-                    expert[2].weight.copy_(w2); expert[2].bias.copy_(b2)
-                else:
+            for expert in list(self.experts) + list(self.shared):
+                if expert[0].weight.shape != w1.shape or expert[2].weight.shape != w2.shape:
                     return False
+                expert[0].weight.copy_(w1); expert[0].bias.copy_(b1)
+                expert[2].weight.copy_(w2); expert[2].bias.copy_(b2)
         except (RuntimeError, AttributeError):
             return False
         return True
@@ -66,10 +74,10 @@ class MoEFFN(nn.Module):
     def forward(self, hidden_states: torch.Tensor, *args, **kwargs) -> torch.Tensor:
         B, L, d = hidden_states.shape
         x = hidden_states.reshape(-1, d)                       # [N, d]
-        logits = self.gate(x)                                  # [N, K]
+        logits = self.gate(x)                                  # [N, E]
+        z_loss = (torch.logsumexp(logits, dim=-1) ** 2).mean()
         probs = F.softmax(logits, dim=-1)
         if self.forced_ids is not None:
-            # Oracle routing: every token of example b goes to expert forced_ids[b] (DEMix-style).
             ids = self.forced_ids.clamp(max=self.n_experts - 1).view(B, 1).expand(B, L).reshape(-1)
             topi = ids.unsqueeze(-1)                            # [N, 1]
             topw = torch.ones_like(topi, dtype=x.dtype)
@@ -78,47 +86,57 @@ class MoEFFN(nn.Module):
             topw = topw / topw.sum(dim=-1, keepdim=True).clamp(min=1e-9)
 
         out = torch.zeros_like(x)
-        for j in range(self.top_k):
-            idx = topi[:, j]                                   # [N]
-            w = topw[:, j].unsqueeze(-1)                       # [N, 1]
+        n_active = topi.shape[1]
+        for j in range(n_active):
+            idx = topi[:, j]
+            w = topw[:, j].unsqueeze(-1)
             for k in range(self.n_experts):
                 sel = idx == k
                 if sel.any():
                     out[sel] += w[sel] * self.experts[k](x[sel])
+        for s in self.shared:                                  # always-on experts
+            out = out + s(x)
 
         top1 = topi[:, 0]
         frac = torch.bincount(top1, minlength=self.n_experts).float() / max(1, top1.numel())
-        self.last_aux = {"frac": frac.detach(), "prob": probs.mean(0),
-                         "raw_aux": self.n_experts * (frac.detach() * probs.mean(0)).sum(),
-                         "top1": top1.detach()}
+        self.last_aux = {"raw_aux": self.n_experts * (frac.detach() * probs.mean(0)).sum(),
+                         "z_loss": z_loss}
+        if self.capture:                                       # [B, L] top-1 expert per token
+            self.last_aux["top1_bl"] = top1.detach().view(B, L)
         return out.reshape(B, L, d)
 
 
 class HardMoE(nn.Module):
-    def __init__(self, backbone, n_experts: int = 4, top_k: int = 1, upcycle: bool = True,
-                 route_by: str = "learned"):
+    def __init__(self, backbone, base_experts: int = 8, granularity: int = 1, base_top_k: int = 1,
+                 n_shared: int = 0, upcycle: bool = False, route_by: str = "learned"):
         super().__init__()
         self.backbone = backbone
-        self.n_experts = n_experts
-        self.route_by = route_by              # 'learned' (token-routed) | 'domain' | 'cluster' (oracle)
+        self.route_by = route_by
+        d_ff = self._ffn_inner(backbone_hidden_size(backbone))
+        self.n_routed = base_experts * granularity
+        self.expert_width = max(1, round(d_ff / granularity))
+        self.top_k = base_top_k * granularity
+        self.n_shared = n_shared
+        self.granularity = granularity
+        self.n_experts = self.n_routed                         # for oracle/eval compatibility
         self.moe_layers: list[MoEFFN] = []
-        self._inject(n_experts, top_k, upcycle)
+        self._inject(upcycle)
 
-    def _inject(self, n_experts: int, top_k: int, upcycle: bool) -> None:
+    def _inject(self, upcycle: bool) -> None:
         d_model = backbone_hidden_size(self.backbone)
-        d_inner = self._ffn_inner(d_model)
         upcycled = 0
         for block in self._transformer_blocks():
             src = block.mlp
-            moe = MoEFFN(d_model, d_inner, n_experts, top_k).to(
+            moe = MoEFFN(d_model, self.expert_width, self.n_routed, self.top_k, self.n_shared).to(
                 next(src.parameters()).device, next(src.parameters()).dtype
             )
             if upcycle and moe.upcycle_from(src):
                 upcycled += 1
             block.mlp = moe
             self.moe_layers.append(moe)
-        logger.info("[hard_moe] injected %d MoE FFNs (K=%d, top_k=%d), upcycled=%d/%d",
-                    len(self.moe_layers), n_experts, top_k, upcycled, len(self.moe_layers))
+        logger.info("[hard_moe] %d layers | routed=%d (G=%d, width=%d, top_k=%d) shared=%d upcycled=%d",
+                    len(self.moe_layers), self.n_routed, self.granularity, self.expert_width,
+                    self.top_k, self.n_shared, upcycled)
 
     def _ffn_inner(self, d_model: int) -> int:
         cfg = self.backbone.config
@@ -130,7 +148,6 @@ class HardMoE(nn.Module):
 
     def _transformer_blocks(self):
         bb = self.backbone
-        # GPT-2: transformer.h ; GPT-NeoX/pythia: gpt_neox.layers ; Llama-style: model.layers
         for path in (("transformer", "h"), ("gpt_neox", "layers"), ("model", "layers")):
             obj = bb
             ok = True
@@ -143,40 +160,42 @@ class HardMoE(nn.Module):
                 return list(obj)
         raise AttributeError("HardMoE: could not locate transformer blocks on this backbone.")
 
+    def set_capture(self, on: bool) -> None:
+        for m in self.moe_layers:
+            m.capture = on
+
     def forward(self, batch, em_hard: bool = False) -> dict:
-        # Oracle routing: pin every layer's expert to the input's domain/cluster (DEMix-style).
         if self.route_by in ("domain", "cluster"):
             key = "domain_id" if self.route_by == "domain" else "cluster_id"
-            ids = batch[key]
             for m in self.moe_layers:
-                m.forced_ids = ids
+                m.forced_ids = batch[key]
         out = self.backbone(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
         for m in self.moe_layers:
             m.forced_ids = None
         per_ex = causal_lm_loss(out.logits, batch["labels"], reduction="per_example")
         aux_balance = sum(m.last_aux.get("raw_aux", 0.0) for m in self.moe_layers)
+        z_loss = sum(m.last_aux.get("z_loss", 0.0) for m in self.moe_layers)
         return {
             "loss": per_ex.mean(),
             "logits": out.logits,
             "per_example_nll": per_ex,
-            "aux": {"route_info": None, "load_balance": aux_balance},
+            "aux": {"route_info": None, "load_balance": aux_balance, "z_loss": z_loss},
         }
 
+    def _per_expert_params(self) -> int:
+        return sum(p.numel() for p in self.moe_layers[0].experts[0].parameters())
+
     def num_added_trainable_params(self) -> int:
-        # MoE FFNs minus one expert's worth (the dense FFN they replaced) per layer.
+        # MoE FFNs (routed + shared) minus one dense FFN's worth per layer.
         extra = 0
         for m in self.moe_layers:
             total = sum(p.numel() for p in m.parameters())
-            one_expert = sum(p.numel() for p in m.experts[0].parameters())
-            extra += total - one_expert
+            extra += total - self._per_expert_params()   # one expert ≈ the dense FFN it replaced
         return extra
 
     def num_active_params(self) -> int:
-        # Per-token compute: only top_k experts run, so the other (K - top_k) experts per
-        # layer are inactive. This is the basis of the compute-matched MoE comparison.
+        # Per token: top_k routed + n_shared shared experts run; the rest are inactive.
         total = sum(p.numel() for p in self.parameters())
-        inactive = 0
-        for m in self.moe_layers:
-            per_expert = sum(p.numel() for p in m.experts[0].parameters())
-            inactive += (m.n_experts - m.top_k) * per_expert
+        per_expert = self._per_expert_params()
+        inactive = sum((m.n_experts - m.top_k) * per_expert for m in self.moe_layers)
         return total - inactive
