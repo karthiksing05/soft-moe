@@ -61,14 +61,16 @@ From [`main_table.md`](main_table.md). "%gap" = fraction of the **dense→fine-M
 | ours — sup + alternating | 2.511 | 1.00 | **1.50×** | 25.6M | 25.6M | −53% |
 | ours — unsup + alternating | 2.554 | 0.62 | 1.06× | 25.9M | 25.9M | — |
 | MoE-oracle (DEMix) | 2.589 | 1.00 (forced) | — | 25.7M | 143M | — |
+| Dense-ceiling (Axis-B) | 2.422 | — | — | 143M | 143M | 68% |
 | **MoE-G1 (coarse)** | **2.592** | 0.01 | — | 25.7M | 143M | −164% |
 | c-BTM (8 models) | 3.214 | — | 3.05× | 25.6M | 205M | — |
-| Dense-ceiling (Axis-B) | ~2.82* | — | — | 143M | 143M | — |
 
-\* Dense-ceiling was still training at writing (very slow — 143M *all-active*, ~5×+ the per-step
-cost of the MoE for the same steps; val≈2.82 at 24k, **overfitting** the fixed data). It will be
-finalized by the pending report job. Preliminary: the same-total-param dense **loses to the
-compute-matched MoE** (2.82 vs 2.399), the Axis-B / Joint-MoE-Scaling-Laws prediction.
+**Axis A (iso-active):** MoE-G2 (2.399) beats Dense-1× (2.472) at equal per-token compute. **Axis B
+(iso-total):** MoE-G2 (2.399) also beats the same-total-param Dense-ceiling (2.422) — while using
+**5.5× fewer active params** (25.7M vs 143M). So the fine-grained MoE wins on *both* axes: more
+capacity than Dense-1× at its compute, and Dense-ceiling's quality at a fraction of its compute
+(the Joint-MoE-Scaling-Laws result). Dense-ceiling confirms capacity helps (2.422 < 2.472), but the
+MoE extracts it far more efficiently.
 
 ## 3. Findings
 
@@ -120,8 +122,8 @@ fine-tuning** eval (H3/H4, where Artetxe/Abnar show the gap compresses or revers
 Axis-C memory accounting. The point estimates here are single-seed.
 
 ## 6. Caveats
-- 1 seed, 30k steps, byte-level; Dense-ceiling still finalizing. Learned-MoE numbers are a lower
-  bound on a fully-tuned MoE (no per-arm LR sweep / granularity beyond G=2 / shared experts here).
+- 1 seed, 30k steps, byte-level. Learned-MoE numbers are a lower bound on a fully-tuned MoE (no
+  per-arm LR sweep / granularity beyond G=2 / shared experts here).
 - routing-NMI for dense/MoE/cbtm in `main_table.md` is the k-means clusterer's NMI (baseline
   reference); the *MoE's own* learned routing-NMI is in `routing_analysis.md` (0.01 / 0.46 / 1.0).
 
