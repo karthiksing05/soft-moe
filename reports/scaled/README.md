@@ -13,10 +13,12 @@ our four variants. Artifacts: [`main_table.md`](main_table.md), [`per_domain_ppl
 
 ## TL;DR
 
-1. **Granularity is decisive — H1/H2 reproduced (Krajewski 2024).** At matched active compute the
+1. **Granularity is decisive — H2 reproduced (Krajewski 2024).** At matched active compute the
    **fine-grained MoE (G=2) beats dense (2.399 vs 2.472)**, but the **coarse MoE (G=1, the
    Switch/Mixtral config) is *worse* than dense (2.592)**. The coarse control saturates/reverses
-   exactly as the recipe warns; granularity does the real work.
+   exactly as the recipe warns; granularity does the real work. (H1 — does the gap *widen* with
+   scale? — needs the sweep: [`scaling_and_ablations.md`](scaling_and_ablations.md) finds it
+   *saturates* at fixed budget/G, not widens.)
 2. **MoE's advantage is fine-grained *capacity*, not *domain* specialization.** The fine-grained
    router stays load-balanced (usage-entropy 1.0) with only *weak emergent* domain correlation
    (doc-level routing-NMI **0.46**, vs 0.01 for coarse). And **oracle domain-routing (DEMix,
@@ -74,12 +76,13 @@ MoE extracts it far more efficiently.
 
 ## 3. Findings
 
-### H1/H2 — granularity is the whole game (reproduced)
+### H2 — granularity is the whole game (reproduced at every scale)
 `MoE-G2 (2.399) < Dense (2.472) < MoE-G1 (2.592)`. The **coarse MoE is worse than dense**; only the
-**fine-grained MoE beats it**. This is the central Krajewski/Ludziejewski (2024) result — the
-coarse GShard/Switch config understates (here reverses) the advantage, and granularity, at ~no
-extra compute, unlocks it. It is also *why* single-point "MoE vs dense" comparisons disagree in
-the literature (§2.3).
+**fine-grained MoE beats it** — and the scaling sweep confirms this holds at *all* four sizes
+(d128→d512). This is the central Krajewski/Ludziejewski (2024) result — the coarse GShard/Switch
+config understates (here reverses) the advantage, and granularity, at ~no extra compute, unlocks
+it. (The *trend* — H1, whether the gap widens — is in [`scaling_and_ablations.md`](scaling_and_ablations.md):
+it **saturates** here, attributable to fixed training budget + fixed G=2.)
 
 ### The mechanism is capacity, not domain routing
 - The fine-grained router is **load-balanced** (usage-entropy 1.0, 0 dead experts) with **weak
