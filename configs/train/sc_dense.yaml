@@ -1,0 +1,14 @@
+# Scaled from-scratch dense/base training (30k steps).
+train:
+  max_steps: 30000
+  batch_size: 16
+  grad_accum: 1
+  grad_clip: 1.0
+  eval_every: 6000
+  log_every: 1000
+  keep_last: 1
+  em: { mode: soft, reassign_every: 0 }
+  lambdas: { sep: 0.0, balance: 0.0, route: 0.0, z: 0.0 }
+  optimizer: { name: adamw, lr: 3.0e-4, wd: 0.01 }
+  scheduler: cosine
+  wandb: { enabled: false }

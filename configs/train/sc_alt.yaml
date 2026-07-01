@@ -1,0 +1,14 @@
+# Scaled from-scratch alternating (backbone<->token), 30k steps.
+train:
+  max_steps: 30000
+  batch_size: 16
+  grad_accum: 1
+  grad_clip: 1.0
+  eval_every: 6000
+  log_every: 1000
+  keep_last: 1
+  em: { mode: soft, reassign_every: 0 }
+  lambdas: { sep: 1.0, balance: 0.1, route: 0.5 }
+  alternation: { enabled: true, start: backbone, backbone_steps: 300, token_steps: 100, backbone_lr: 3.0e-4, token_lr: 1.0e-2 }
+  scheduler: cosine
+  wandb: { enabled: false }

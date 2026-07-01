@@ -1,0 +1,5 @@
+# Axis-B: total-parameter-matched big dense (FFN = 8x wide), same training budget (data-starved).
+defaults: [/data/demix8, /train/sc_dense, /eval/default]
+meta: { name: sc_dense_ceiling, regime: dense_ceiling }
+model: { method: dense, backbone_mode: full, backbone: { kind: tiny, tiny: { n_embd: 512, n_layer: 8, n_head: 8, n_inner: 16384, n_positions: 576 } } }
+seed: 0

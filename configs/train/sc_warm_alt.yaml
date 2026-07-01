@@ -1,0 +1,14 @@
+# Scaled sequential stage-2: warm-start pretrained base, alternate to converge tokens (15k steps).
+train:
+  max_steps: 15000
+  batch_size: 16
+  grad_accum: 1
+  grad_clip: 1.0
+  eval_every: 5000
+  log_every: 1000
+  keep_last: 1
+  em: { mode: soft, reassign_every: 0 }
+  lambdas: { sep: 1.0, balance: 0.1, route: 0.5 }
+  alternation: { enabled: true, start: tokens, backbone_steps: 200, token_steps: 200, backbone_lr: 5.0e-5, token_lr: 1.0e-2 }
+  scheduler: cosine
+  wandb: { enabled: false }

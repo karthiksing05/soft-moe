@@ -1,0 +1,5 @@
+# Oracle domain-routed MoE = DEMix (Gururangan 2021). 8 experts, one per domain.
+defaults: [/data/demix8, /train/sc_moe, /eval/default]
+meta: { name: sc_moe_oracle, regime: moe_oracle }
+model: { method: hard_moe, backbone_mode: full, backbone: { kind: tiny, tiny: { n_embd: 512, n_layer: 8, n_head: 8, n_inner: 2048, n_positions: 576 } }, hard_moe: { base_experts: 8, granularity: 1, top_k: 1, upcycle: false, route_by: domain } }
+seed: 0

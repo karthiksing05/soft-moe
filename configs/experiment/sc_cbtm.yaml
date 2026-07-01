@@ -1,0 +1,5 @@
+# c-BTM (Gururangan 2023): 8 separate per-cluster models.
+defaults: [/data/demix8, /train/sc_dense, /eval/default]
+meta: { name: sc_cbtm, regime: cbtm }
+model: { method: cbtm, n_clusters: auto, route_by: cluster, backbone: { kind: tiny, tiny: { n_embd: 512, n_layer: 8, n_head: 8, n_inner: 2048, n_positions: 576 } } }
+seed: 0
