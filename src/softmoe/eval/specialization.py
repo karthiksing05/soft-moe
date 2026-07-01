@@ -92,7 +92,7 @@ def contingency_matrix(pred_expert: np.ndarray, true_domain: np.ndarray,
 
 @torch.no_grad()
 def swap_test(model, dataset, device: str = "cpu", batch_size: int = 8, pad_token_id: int = 0,
-              max_batches: int = 20) -> dict:
+              max_batches: int = 80) -> dict:
     """Route inputs through the *wrong* expert and measure the perplexity increase.
 
     Large degradation ⇒ tokens carry genuine, non-interchangeable expertise (the strongest
@@ -109,7 +109,8 @@ def swap_test(model, dataset, device: str = "cpu", batch_size: int = 8, pad_toke
         return {"swap_ppl_increase": float("nan"), "correct_ppl": float("nan"), "wrong_ppl": float("nan")}
 
     model.eval(); model.to(device)
-    loader = DataLoader(dataset, batch_size=batch_size, collate_fn=Collator(pad_token_id))
+    # shuffle so the sampled batches span every domain (the test set is domain-ordered).
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=Collator(pad_token_id))
     K = model.tokens.n_experts
     key = "domain_id" if model.router_supervise_with == "domain" else "cluster_id"
     correct_nll, wrong_nll, ntok = 0.0, 0.0, 0.0

@@ -18,7 +18,7 @@ from softmoe.models.baselines.hard_moe import HardMoE
 
 @torch.no_grad()
 def moe_domain_utilization(model, dataset, device: str = "cpu", batch_size: int = 8,
-                           pad_token_id: int = 0, max_batches: int = 40) -> dict:
+                           pad_token_id: int = 0, max_batches: int = 300) -> dict:
     if not isinstance(model, HardMoE):
         return {}
     model.eval(); model.to(device)
@@ -29,7 +29,8 @@ def moe_domain_utilization(model, dataset, device: str = "cpu", batch_size: int 
     counts = np.zeros((E, D))                       # expert x domain, summed over all layers+tokens
     doc_expert, doc_domain = [], []                 # per-doc dominant expert (all layers) for NMI
 
-    loader = DataLoader(dataset, batch_size=batch_size, collate_fn=Collator(pad_token_id))
+    # shuffle so the sampled batches span every domain (the test set is domain-ordered).
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=Collator(pad_token_id))
     for i, batch in enumerate(loader):
         if i >= max_batches:
             break
