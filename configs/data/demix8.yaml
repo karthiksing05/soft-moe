@@ -8,11 +8,11 @@ data:
   clusterer: { kind: kmeans, n_clusters: 8 }
   domains:
     - { name: wiki,    source: hf, hf_path: wikitext,                  hf_config: wikitext-103-raw-v1, split: train, text_field: text,     max_docs: 10000, min_chars: 200 }
-    - { name: news,    source: hf, hf_path: ag_news,                                                  split: train, text_field: text,     max_docs: 10000, min_chars: 64  }
-    - { name: reviews, source: hf, hf_path: imdb,                                                     split: train, text_field: text,     max_docs: 10000, min_chars: 200 }
-    - { name: arxiv,   source: hf, hf_path: ccdv/arxiv-summarization,                                 split: train, text_field: abstract, max_docs: 10000, min_chars: 200 }
-    - { name: pubmed,  source: hf, hf_path: ccdv/pubmed-summarization,                                split: train, text_field: abstract, max_docs: 10000, min_chars: 200 }
-    - { name: math,    source: hf, hf_path: gsm8k,                     hf_config: main,               split: train, text_field: question, max_docs: 7000,  min_chars: 32  }
-    - { name: legal,   source: hf, hf_path: billsum,                                                  split: train, text_field: text,     max_docs: 10000, min_chars: 200 }
-    - { name: stories, source: hf, hf_path: roneneldan/TinyStories,                                   split: train, text_field: text,     max_docs: 10000, min_chars: 200 }
+    - { name: news,    source: hf, hf_path: ag_news,                                                  split: train, text_field: text,     max_docs: 32000, min_chars: 64  }
+    - { name: reviews, source: hf, hf_path: imdb,                                                     split: train, text_field: text,     max_docs: 6000, min_chars: 200 }
+    - { name: arxiv,   source: hf, hf_path: ccdv/arxiv-summarization,                                 split: train, text_field: abstract, max_docs: 5000, min_chars: 200 }
+    - { name: pubmed,  source: hf, hf_path: ccdv/pubmed-summarization,                                split: train, text_field: abstract, max_docs: 6500, min_chars: 200 }
+    - { name: math,    source: hf, hf_path: gsm8k,                     hf_config: main,               split: train, text_field: question, max_docs: 7400,  min_chars: 32  }
+    - { name: legal,   source: hf, hf_path: billsum,                                                  split: train, text_field: text,     max_docs: 1500, min_chars: 200 }
+    - { name: stories, source: hf, hf_path: roneneldan/TinyStories,                                   split: train, text_field: text,     max_docs: 9000, min_chars: 200 }
   splits: { train: 0.9, val: 0.05, test: 0.05 }
