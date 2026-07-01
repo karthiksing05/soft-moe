@@ -6,19 +6,29 @@ recipe's §8 priority order. Data: [`scaling_sweep.md`](scaling_sweep.md); figur
 
 ## 1. isoFLOP scaling sweep (H1/H2) — the load-bearing deferred result
 
-Dense / coarse-MoE (G=1) / fine-MoE (G=2) trained from scratch at **four sizes** (d128→d512,
-0.9M→25.6M active), 20k steps each, **3 seeds at d256** for error bars.
+Dense / coarse-MoE (G=1) / fine-MoE (G=2) / **ours** trained from scratch at **four sizes**
+(d128→d512, 0.9M→25.6M active), 20k steps each, **3 seeds at d256** for error bars. `ours` =
+from-scratch alternating, supervised routing, T=1 (compute-matched to the other arms).
+Figures: `comparison_figures/9_scaling_curves.png`, `10_gap_vs_scale.png`.
 
-| size | active | dense | MoE-G1 (coarse) | MoE-G2 (fine) | **dense−G2 gap** |
-|---|---|---|---|---|---|
-| d128 | 0.9M | 3.876 | 3.951 | 3.437 | **+0.440** (11.4%) |
-| d256 | 5.0M | 2.971±.004 | 3.017±.012 | 2.692±.030 | **+0.278** (9.4%) |
-| d384 | 11.0M | 2.681 | 2.832 | 2.520 | **+0.161** (6.0%) |
-| d512 | 25.6M | 2.535 | 2.704 | 2.465 | **+0.071** (2.8%) |
+| size | active | dense | MoE-G1 (coarse) | MoE-G2 (fine) | ours | **dense−G2** | **dense−ours** |
+|---|---|---|---|---|---|---|---|
+| d128 | 0.9M | 3.876 | 3.951 | 3.437 | 3.849 | **+0.440** | +0.028 |
+| d256 | 5.0M | 2.971±.004 | 3.017±.012 | 2.692±.030 | 3.032 | **+0.278** | −0.061 |
+| d384 | 11.0M | 2.681 | 2.832 | 2.520 | 2.727 | **+0.161** | −0.045 |
+| d512 | 25.6M | 2.535 | 2.704 | 2.465 | 2.603 | **+0.071** | −0.068 |
 
 **H2 — granularity does real work (confirmed at *every* scale):** MoE-G2 beats dense at all four
 sizes; coarse MoE-G1 is *worse* than dense at all four. The coarse Switch/Mixtral config never
 helps here — exactly the recipe's warning.
+
+**Ours (from-scratch, compute-matched) does *not* scale like the MoE.** The `dense−ours` gap is
+~0 at d128 and *negative* (ours worse than dense) at d256+, and does not improve with scale — the
+opposite of MoE-G2's consistently-positive, if shrinking, gap. This is the from-scratch *alternating*
+variant, and it confirms the throughline: **conditioning at matched compute from scratch doesn't beat
+dense**; the variant that *does* beat dense is the *sequential* one (`ours_sup_seq` 2.464 < dense
+2.472 at d512 in the main run), which spends **extra** pretraining compute on the backbone — i.e. our
+method is a cheap add-on to an already-trained LLM, not a from-scratch compute-competitive architecture.
 
 **H1 — gap widens with scale? NOT reproduced (honest).** The fine-grained advantage **shrinks**
 with size (11.4%→2.8%) — the *saturation* pattern of Clark et al. (2022), not the *widening* of
@@ -51,6 +61,21 @@ loop in `MoEFFN` is O(#experts) per layer and became impractically slow at 32/64
 reached only 3k/20k steps in >3h). This is a real implementation limitation — production MoEs use
 batched/grouped-GEMM expert compute; ours is a from-scratch minimal kernel. G=4 was still running
 at writing.
+
+## 2b. T-ablation — tokens per expert ∈ {1, 2, 4}, all four ours variants (d512)
+Does more than one soft-prompt vector per expert help? (Figure `comparison_figures/11_t_ablation.png`.)
+
+| method | T=1 | T=2 | T=4 |
+|---|---|---|---|
+| sup + alternating | 2.511 | 2.510 | 2.509 |
+| unsup + alternating | 2.554 | 2.550 | 2.556 |
+| sup + sequential | 2.464 | 2.463 | 2.469 |
+| unsup + sequential | 2.476 | 2.475 | 2.482 |
+
+**T=1 is as good as T=2/4 for all four variants** — differences ≤0.008 (within seed noise), and T=4
+slightly *hurts* the sequential variants. So **more expert vectors per expert does not help**;
+a single learned soft-prompt vector per expert suffices. This validates the thesis-faithful T=1
+default (an earlier T=4-looked-better observation was run-to-run noise, not a real effect).
 
 ## 3. Memory axis (Axis C / H5) — already answered
 Memory ≈ total parameters. From the main run, at **equal total params (143M)**:
