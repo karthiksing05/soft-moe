@@ -1,0 +1,133 @@
+# Domain routing analysis (every model)
+
+Per-model expert↔domain specialization: our expert-token methods show an expert×domain **perplexity** matrix (swap test); the MoE arm shows its learned expert×domain **token-routing** distribution + routing-NMI.
+
+### moe_g1
+
+Learned MoE token-routing — fraction of each **domain**'s tokens sent to each **expert** (top-1, summed over 8 layers). **Routing-NMI vs domain: 0.009** · usage-entropy 1.00 · dead experts 0/8.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 |
+|---|---|---|---|---|---|---|---|---|
+| wiki | 0.12 | 0.12 | 0.13 | 0.13 | 0.12 | 0.13 | 0.12 | 0.12 |
+| news | 0.13 | 0.13 | 0.13 | 0.13 | 0.12 | 0.12 | 0.12 | 0.13 |
+| reviews | 0.13 | 0.12 | 0.13 | 0.12 | 0.13 | 0.13 | 0.12 | 0.12 |
+| arxiv | 0.13 | 0.13 | 0.13 | 0.13 | 0.12 | 0.13 | 0.12 | 0.13 |
+| pubmed | 0.13 | 0.13 | 0.12 | 0.12 | 0.12 | 0.12 | 0.13 | 0.13 |
+| math | 0.13 | 0.13 | 0.13 | 0.12 | 0.13 | 0.12 | 0.13 | 0.13 |
+| legal | 0.13 | 0.12 | 0.13 | 0.12 | 0.13 | 0.13 | 0.12 | 0.13 |
+| stories | 0.12 | 0.13 | 0.12 | 0.13 | 0.12 | 0.12 | 0.13 | 0.12 |
+
+### moe_g2
+
+Learned MoE token-routing — fraction of each **domain**'s tokens sent to each **expert** (top-1, summed over 8 layers). **Routing-NMI vs domain: 0.462** · usage-entropy 1.00 · dead experts 0/16.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 | e8 | e9 | e10 | e11 | e12 | e13 | e14 | e15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| wiki | 0.06 | 0.07 | 0.05 | 0.05 | 0.06 | 0.06 | 0.06 | 0.07 | 0.06 | 0.06 | 0.06 | 0.06 | 0.06 | 0.06 | 0.07 | 0.07 |
+| news | 0.07 | 0.07 | 0.05 | 0.08 | 0.06 | 0.06 | 0.06 | 0.07 | 0.06 | 0.07 | 0.06 | 0.06 | 0.07 | 0.06 | 0.05 | 0.06 |
+| reviews | 0.06 | 0.06 | 0.06 | 0.07 | 0.06 | 0.06 | 0.06 | 0.07 | 0.06 | 0.05 | 0.06 | 0.06 | 0.06 | 0.06 | 0.06 | 0.08 |
+| arxiv | 0.06 | 0.06 | 0.08 | 0.04 | 0.07 | 0.07 | 0.07 | 0.06 | 0.06 | 0.07 | 0.06 | 0.06 | 0.06 | 0.06 | 0.05 | 0.07 |
+| pubmed | 0.06 | 0.06 | 0.08 | 0.04 | 0.07 | 0.07 | 0.07 | 0.06 | 0.06 | 0.06 | 0.06 | 0.07 | 0.06 | 0.06 | 0.05 | 0.07 |
+| math | 0.07 | 0.06 | 0.06 | 0.08 | 0.07 | 0.07 | 0.05 | 0.07 | 0.06 | 0.05 | 0.06 | 0.06 | 0.06 | 0.06 | 0.06 | 0.07 |
+| legal | 0.06 | 0.06 | 0.05 | 0.07 | 0.06 | 0.06 | 0.06 | 0.07 | 0.06 | 0.07 | 0.07 | 0.06 | 0.06 | 0.06 | 0.07 | 0.05 |
+| stories | 0.07 | 0.06 | 0.07 | 0.08 | 0.06 | 0.07 | 0.05 | 0.07 | 0.07 | 0.05 | 0.06 | 0.07 | 0.06 | 0.06 | 0.06 | 0.06 |
+
+### moe_oracle
+
+Learned MoE token-routing — fraction of each **domain**'s tokens sent to each **expert** (top-1, summed over 8 layers). **Routing-NMI vs domain: 1.000** · usage-entropy 0.96 · dead experts 0/8.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 |
+|---|---|---|---|---|---|---|---|---|
+| wiki | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| news | 0.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| reviews | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| arxiv | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| pubmed | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 | 0.00 |
+| math | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 |
+| legal | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 | 0.00 |
+| stories | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 1.00 |
+
+### cbtm
+
+Perplexity of each **domain** (row) routed through each **expert** (column). `*` marks the domain's own (routed/cluster) expert; **bold** marks the lowest-perplexity expert in the row. Specialization ⇒ the `*` and **bold** coincide and the diagonal is well below the rest.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 | self-ppl | other-mean | ×worse |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| wiki | 15.1 | 8.6 | 5.6 | 13.0 | **3.1*** | 14.9 | 5.6 | 4.2 | 3.1 | 9.6 | 3.10× |
+| news | 12.5 | 5.6 | 6.8 | 16.4 | 4.5 | 13.5 | 8.9 | **3.5*** | 3.5 | 9.7 | 2.79× |
+| reviews | 15.3 | 8.7 | **3.4*** | 13.0 | 3.9 | 15.2 | 5.5 | 4.8 | 3.4 | 9.5 | 2.78× |
+| arxiv | 16.2 | 10.9 | 7.1 | 16.0 | **2.5*** | 16.3 | 8.3 | 4.2 | 2.5 | 11.3 | 4.58× |
+| pubmed | 15.0 | 10.1 | 6.9 | 15.1 | **2.5*** | 14.7 | 8.0 | 4.2 | 2.5 | 10.6 | 4.25× |
+| math | 13.3 | 7.4 | 5.1 | 6.3* | **3.4** | 13.4 | 4.8 | 4.7 | 6.3 | 7.4 | 1.18× |
+| legal | 12.5 | 7.8 | 5.6 | 16.8 | **1.8*** | 15.9 | 7.9 | 4.5 | 1.8 | 10.2 | 5.67× |
+| stories | 14.0 | 7.7 | 4.1 | 8.9 | 3.6 | 13.9 | **2.0*** | 4.3 | 2.0 | 8.1 | 4.02× |
+
+**Summary:** mean self-expert ppl 3.1 vs mean other-expert ppl 9.5 → **3.05× worse** through the wrong expert; lowest-ppl expert is the matched one for **88%** of domains.
+
+### ours_sup_alt
+
+Perplexity of each **domain** (row) routed through each **expert** (column). `*` marks the domain's own (routed/cluster) expert; **bold** marks the lowest-perplexity expert in the row. Specialization ⇒ the `*` and **bold** coincide and the diagonal is well below the rest.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 | self-ppl | other-mean | ×worse |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| wiki | **3.0*** | 3.9 | 3.7 | 4.1 | 3.8 | 4.2 | 4.1 | 5.1 | 3.0 | 4.1 | 1.39× |
+| news | 4.0 | **2.9*** | 3.7 | 5.2 | 4.8 | 3.9 | 4.0 | 4.8 | 2.9 | 4.3 | 1.52× |
+| reviews | 4.0 | 3.5 | **3.1*** | 5.2 | 5.0 | 4.0 | 4.2 | 4.2 | 3.1 | 4.3 | 1.39× |
+| arxiv | 3.1 | 3.9 | 3.7 | **2.5*** | 2.8 | 4.0 | 3.9 | 4.7 | 2.5 | 3.7 | 1.50× |
+| pubmed | 3.0 | 3.8 | 3.7 | 2.9 | **2.5*** | 3.9 | 3.6 | 4.8 | 2.5 | 3.7 | 1.46× |
+| math | 3.5 | 3.2 | 3.2 | 4.3 | 4.0 | **2.4*** | 3.4 | 3.3 | 2.4 | 3.6 | 1.49× |
+| legal | 2.8 | 2.7 | 2.8 | 3.2 | 2.9 | 2.7 | **1.8*** | 3.5 | 1.8 | 2.9 | 1.60× |
+| stories | 3.1 | 2.8 | 2.6 | 4.1 | 3.9 | 2.5 | 3.2 | **2.0*** | 2.0 | 3.2 | 1.62× |
+
+**Summary:** mean self-expert ppl 2.5 vs mean other-expert ppl 3.7 → **1.48× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
+
+### ours_unsup_alt
+
+Perplexity of each **domain** (row) routed through each **expert** (column). `*` marks the domain's own (routed/cluster) expert; **bold** marks the lowest-perplexity expert in the row. Specialization ⇒ the `*` and **bold** coincide and the diagonal is well below the rest.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 | self-ppl | other-mean | ×worse |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| wiki | 3.1 | 3.1 | 3.1 | 3.1 | **3.0*** | 3.1 | 3.2 | 3.1 | 3.0 | 3.1 | 1.02× |
+| news | 2.9 | 2.9 | 3.2 | 3.1 | 3.0 | 2.9 | 3.4 | **2.9*** | 2.9 | 3.1 | 1.06× |
+| reviews | 3.3 | 3.3 | **3.1*** | 3.4 | 3.2 | 3.2 | 3.4 | 3.3 | 3.1 | 3.3 | 1.06× |
+| arxiv | 2.6 | 2.6 | 2.7 | 2.6 | **2.5*** | 2.6 | 2.7 | 2.6 | 2.5 | 2.6 | 1.05× |
+| pubmed | 2.7 | 2.7 | 2.7 | 2.7 | **2.6*** | 2.6 | 2.8 | 2.6 | 2.6 | 2.7 | 1.05× |
+| math | 2.6 | 2.7 | 2.7 | **2.4*** | 2.6 | 2.5 | 2.6 | 2.6 | 2.4 | 2.6 | 1.08× |
+| legal | 1.9 | 2.0 | 2.0 | 2.0 | **1.9*** | 1.9 | 2.0 | 1.9 | 1.9 | 2.0 | 1.05× |
+| stories | 2.3 | 2.4 | 2.3 | 2.2 | 2.3 | 2.2 | **2.0*** | 2.4 | 2.0 | 2.3 | 1.16× |
+
+**Summary:** mean self-expert ppl 2.5 vs mean other-expert ppl 2.7 → **1.06× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
+
+### ours_sup_seq
+
+Perplexity of each **domain** (row) routed through each **expert** (column). `*` marks the domain's own (routed/cluster) expert; **bold** marks the lowest-perplexity expert in the row. Specialization ⇒ the `*` and **bold** coincide and the diagonal is well below the rest.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 | self-ppl | other-mean | ×worse |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| wiki | **2.9*** | 2.9 | 2.9 | 2.9 | 2.9 | 3.0 | 3.0 | 3.0 | 2.9 | 2.9 | 1.02× |
+| news | 2.8 | **2.8*** | 2.8 | 2.8 | 2.8 | 2.8 | 2.8 | 2.8 | 2.8 | 2.8 | 1.02× |
+| reviews | 3.1 | 3.1 | **3.1*** | 3.1 | 3.1 | 3.1 | 3.1 | 3.1 | 3.1 | 3.1 | 1.02× |
+| arxiv | 2.5 | 2.5 | 2.5 | **2.4*** | 2.5 | 2.5 | 2.5 | 2.5 | 2.4 | 2.5 | 1.03× |
+| pubmed | 2.5 | 2.6 | 2.5 | 2.5 | **2.5*** | 2.5 | 2.5 | 2.5 | 2.5 | 2.5 | 1.03× |
+| math | 2.4 | 2.4 | 2.4 | 2.4 | 2.4 | **2.4*** | 2.4 | 2.4 | 2.4 | 2.4 | 1.02× |
+| legal | 1.8 | 1.8 | 1.8 | 1.8 | 1.8 | 1.8 | **1.8*** | 1.8 | 1.8 | 1.8 | 1.02× |
+| stories | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | 2.0 | **1.9*** | 1.9 | 2.0 | 1.02× |
+
+**Summary:** mean self-expert ppl 2.5 vs mean other-expert ppl 2.5 → **1.02× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
+
+### ours_unsup_seq
+
+Perplexity of each **domain** (row) routed through each **expert** (column). `*` marks the domain's own (routed/cluster) expert; **bold** marks the lowest-perplexity expert in the row. Specialization ⇒ the `*` and **bold** coincide and the diagonal is well below the rest.
+
+| domain ↓ / expert → | e0 | e1 | e2 | e3 | e4 | e5 | e6 | e7 | self-ppl | other-mean | ×worse |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| wiki | 2.9 | 2.9 | 2.9 | 2.9 | **2.9*** | 3.1 | 2.9 | 2.9 | 2.9 | 3.0 | 1.01× |
+| news | 2.8 | **2.8** | 2.8 | 2.8 | 2.8 | 2.9 | 2.8 | 2.8* | 2.8 | 2.8 | 1.02× |
+| reviews | 3.1 | 3.1 | **3.1*** | 3.1 | 3.1 | 3.2 | 3.1 | 3.1 | 3.1 | 3.1 | 1.02× |
+| arxiv | 2.5 | 2.5 | 2.5 | 2.5 | **2.5*** | 2.6 | 2.5 | 2.5 | 2.5 | 2.5 | 1.02× |
+| pubmed | 2.5 | 2.5 | 2.5 | 2.5 | **2.5*** | 2.7 | 2.5 | 2.5 | 2.5 | 2.5 | 1.03× |
+| math | 2.4 | 2.4 | 2.4 | **2.4*** | 2.4 | 2.5 | 2.4 | 2.4 | 2.4 | 2.4 | 1.02× |
+| legal | 1.8 | 1.8 | 1.8 | 1.8 | **1.8*** | 1.9 | 1.8 | 1.8 | 1.8 | 1.8 | 1.02× |
+| stories | 2.0 | 2.0 | 2.0 | 1.9 | 2.0 | 2.1 | **1.9*** | 2.0 | 1.9 | 2.0 | 1.03× |
+
+**Summary:** mean self-expert ppl 2.5 vs mean other-expert ppl 2.5 → **1.02× worse** through the wrong expert; lowest-ppl expert is the matched one for **100%** of domains.
