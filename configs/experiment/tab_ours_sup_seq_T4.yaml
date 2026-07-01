@@ -1,0 +1,12 @@
+# T-ablation: sup_seq with tokens_per_expert=4 (T=1 is the sc_ours_sup_seq run).
+defaults: [/data/demix8, /train/sc_warm_alt, /eval/default]
+meta: { name: tab_ours_sup_seq_T4, regime: ours_sup_seq_T4 }
+model:
+  method: softmoe
+  backbone_mode: full
+  injection: prefix
+  backbone: { kind: tiny, tiny: { n_embd: 512, n_layer: 8, n_head: 8, n_inner: 2048, n_positions: 576 } }
+  expert_tokens: { n_experts: auto, tokens_per_expert: 4, init: from_cluster_centroids, trainable: true }
+  router: { kind: supervised, route_by: domain }
+  router_supervise_with: domain
+seed: 0
