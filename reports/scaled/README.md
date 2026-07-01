@@ -113,7 +113,11 @@ See [`per_domain_ppl.md`](per_domain_ppl.md). MoE-G2 is best or tied on **all 8 
 coarse MoE is worst-or-near on all; c-BTM wins only `legal` (its data-richest cluster) and is far
 worse on small domains (`math` 5.87) — the classic c-BTM data-starvation across 8 sub-corpora.
 
-## 5. What this run does *not* cover (recipe parts deferred)
+## 5. Deferred recipe parts — now completed
+
+The scaling sweep, ablation matrix, and axes are completed in **[`scaling_and_ablations.md`](scaling_and_ablations.md)** (H2 holds across scale; H1 widening not observed at fixed budget/G; top-k & balancing are first-order; memory-matched MoE wins). Original deferral note:
+
+### (original) What this run does *not* cover
 The full SCALED_RECIPE.md is a multi-week study; this is its §8 load-bearing subset at one budget.
 Not done here (the natural extensions): the **isoFLOP scaling *sweep*** across ≥5 budgets (to fit
 the curve and show the gap *trend*, H1's strongest form), **downstream/few-shot + full
