@@ -82,6 +82,8 @@ def build_model(cfg, *, vocab_size: int, data_n_experts: int, centroids=None):
             "soft_mixture": model_cfg.get("soft_mixture", False),
             "router_supervise_with": model_cfg.get("router_supervise_with"),
             "mop_average": model_cfg.get("mop_average", False),
+            "token_predict_marker": model_cfg.get("token_predict_marker", True),
+            "pad_token_id": vocab_size and 0,  # byte tokenizer pads with 0
         }
         logger.info(
             "[factory] SoftMoE: K=%d T=%d inject=%s router=%s trainable_tokens=%s backbone_mode=%s",
