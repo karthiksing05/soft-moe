@@ -116,9 +116,9 @@ def _load_backbone_weights(model, init_from: str) -> None:
         raise FileNotFoundError(f"--init-backbone-from: no checkpoint at {ckpt}")
     state = torch.load(ckpt, map_location="cpu", weights_only=False)["model"]
     tgt = model.state_dict()
+    _pfx = ("backbone.", "tokens.", "router.", "governor.")
     keep = {k: v for k, v in state.items()
-            if (k.startswith("backbone.") or k.startswith("tokens.") or k.startswith("router."))
-            and k in tgt and tgt[k].shape == v.shape}
+            if k.startswith(_pfx) and k in tgt and tgt[k].shape == v.shape}
     if not any(k.startswith("backbone.") for k in keep):
         raise ValueError(f"No 'backbone.*' weights found in {ckpt}.")
     model.load_state_dict(keep, strict=False)

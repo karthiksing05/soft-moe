@@ -75,6 +75,12 @@ class SoftMoE(nn.Module):
         else:
             self.prefix_encoder = None
 
+        # FFN subspace governance: the expert token drives a per-layer modulation of the FFN hidden
+        # (film = neuron gate, spectral = principal-direction gate) — the MoE-structured alternative
+        # to prefix/token injection. Built + attached in the factory (needs the backbone's FFN dims).
+        self.governor = None
+        self.governs = self.injection in ("film_ffn", "spectral_ffn")
+
     # ---- routing ---------------------------------------------------------------------
     def _router_hidden(self, batch):
         # cheap proxy for "first backbone hidden state": input embeddings, mean-pooled later.
@@ -151,7 +157,22 @@ class SoftMoE(nn.Module):
         per_ex = causal_lm_loss(full_logits, comb_labels, reduction="per_example")
         return per_ex, out.logits[:, 1 + Tm:, :]
 
+    def _forward_with_governance(self, input_ids, attention_mask, labels, expert_ids):
+        """Governance mode: the expert token modulates each block's FFN (no prefix prepended)."""
+        e = self.tokens(expert_ids)[:, 0, :]                    # [B, d]  the per-expert latent
+        self.governor.set_current(e)
+        try:
+            out = self.backbone(input_ids=input_ids, attention_mask=attention_mask)
+        finally:
+            self.governor.clear()
+        per_ex = causal_lm_loss(out.logits, labels, reduction="per_example")
+        return per_ex, out.logits
+
     def _single_expert_forward(self, batch, expert_ids):
+        if self.governs:
+            return self._forward_with_governance(
+                batch["input_ids"], batch["attention_mask"], batch["labels"], expert_ids
+            )
         if self.injection == "token":
             return self._forward_with_token(
                 batch["input_ids"], batch["attention_mask"], batch["labels"], expert_ids
@@ -226,6 +247,8 @@ class SoftMoE(nn.Module):
         n = self.tokens.num_added_params()
         if self.prefix_encoder is not None:
             n += sum(p.numel() for p in self.prefix_encoder.parameters() if p.requires_grad)
+        if self.governor is not None:
+            n += self.governor.num_params(trainable_only=True)
         n += sum(p.numel() for p in self.router.parameters() if p.requires_grad)
         return n
 
@@ -236,4 +259,6 @@ class SoftMoE(nn.Module):
         n += self.tokens.embeddings[0].numel()              # one expert active per input
         if self.prefix_encoder is not None:
             n += sum(p.numel() for p in self.prefix_encoder.parameters())
+        if self.governor is not None:
+            n += self.governor.num_params()                 # the shared hypernet is always active
         return n
