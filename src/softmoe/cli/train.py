@@ -99,10 +99,14 @@ def _pad_id(tokenizer_name: str) -> int:
 
 
 def _load_backbone_weights(model, init_from: str) -> None:
-    """Copy ``backbone.*`` weights from a trained run into ``model`` (sequential regime).
+    """Warm-start ``backbone.*`` (and, when present, ``tokens.*`` / ``router.*``) from a prior run.
 
     ``init_from`` is a run dir (uses ``checkpoints/best.pt``) or a direct .pt path. Both Dense and
-    SoftMoE store the LM under ``self.backbone``, so the backbone keys line up.
+    SoftMoE store the LM under ``self.backbone``, so the backbone keys line up. For the
+    thesis-faithful **sequential** regime the source is a *Phase-A* run (backbone trained with the
+    expert tokens present-but-frozen); carrying those same token vectors into Phase B is what lets
+    the frozen backbone keep using them while only the tokens are optimised. Loading ``tokens.*`` is
+    a no-op when the source has none (e.g. a plain Dense Phase-A), and is shape-matched (strict=False).
     """
     import torch
 
@@ -111,12 +115,16 @@ def _load_backbone_weights(model, init_from: str) -> None:
     if not ckpt.exists():
         raise FileNotFoundError(f"--init-backbone-from: no checkpoint at {ckpt}")
     state = torch.load(ckpt, map_location="cpu", weights_only=False)["model"]
-    bb = {k: v for k, v in state.items() if k.startswith("backbone.")}
-    if not bb:
+    tgt = model.state_dict()
+    keep = {k: v for k, v in state.items()
+            if (k.startswith("backbone.") or k.startswith("tokens.") or k.startswith("router."))
+            and k in tgt and tgt[k].shape == v.shape}
+    if not any(k.startswith("backbone.") for k in keep):
         raise ValueError(f"No 'backbone.*' weights found in {ckpt}.")
-    missing, unexpected = model.load_state_dict(bb, strict=False)
-    loaded = len(bb) - len([k for k in bb if k in unexpected])
-    logger.info("[init] warm-started %d backbone tensors from %s", loaded, ckpt)
+    model.load_state_dict(keep, strict=False)
+    nbb = sum(k.startswith("backbone.") for k in keep)
+    ntok = sum(k.startswith("tokens.") for k in keep)
+    logger.info("[init] warm-started %d backbone + %d token/router tensors from %s", nbb, ntok, ckpt)
 
 
 if __name__ == "__main__":

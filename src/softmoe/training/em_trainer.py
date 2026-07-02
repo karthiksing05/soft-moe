@@ -112,6 +112,18 @@ class EMTrainer:
             p.requires_grad_(not train_bb)
         groups["cur"] = phase
 
+    @torch.no_grad()
+    def _inject_token_noise(self, model, std: float, phase) -> None:
+        """Add Gaussian noise to the expert-token embeddings after a token update (thesis Phase B).
+
+        Applied only when the tokens are the thing being trained (joint token-only Phase B where
+        ``phase is None``, or the token sub-phase of an alternation) and only to trainable params."""
+        if phase == "backbone":
+            return
+        emb = getattr(getattr(model, "tokens", None), "embeddings", None)
+        if emb is not None and emb.requires_grad:
+            emb.add_(torch.randn_like(emb) * std)
+
     def _loader(self, ds: SoftMoEDataset, train: bool):
         bs = int(self.tcfg.get("batch_size", 8))
         pad = int(self.cfg.get_path("data.pad_token_id", 0) or 0)
@@ -153,6 +165,9 @@ class EMTrainer:
         eval_every = int(self.tcfg.get("eval_every", max(1, max_steps // 4)))
         log_every = int(self.tcfg.get("log_every", max(1, max_steps // 20)))
         lambdas = dict(self.tcfg.get("lambdas", {}))
+        # thesis Phase B: inject noise into the persona/expert embeddings after each update to
+        # prevent all embeddings collapsing to the same vector (Xie et al. 2020, two-time-scale).
+        noise_std = float(self.tcfg.get("token_noise_std", 0.0))
         em = dict(self.tcfg.get("em", {"mode": "soft"}))
         em_hard = em.get("mode") == "hard"
         reassign_every = int(em.get("reassign_every", 0))
@@ -190,6 +205,8 @@ class EMTrainer:
                 else:
                     torch.nn.utils.clip_grad_norm_([p for p in model.parameters() if p.requires_grad], clip)
                     opt.step(); sched.step(); opt.zero_grad()
+                if noise_std > 0.0 and isinstance(model, SoftMoE):
+                    self._inject_token_noise(model, noise_std, phase)
 
             if step % log_every == 0 or step == 1:
                 if not use_alt:

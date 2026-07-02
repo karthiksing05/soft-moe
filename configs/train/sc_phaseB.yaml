@@ -1,0 +1,17 @@
+# Thesis Phase B — freeze the backbone, optimise ONLY the expert tokens (soft prompt tuning),
+# high token LR (two time-scale) + noise injection to prevent embedding collapse. Warm-started
+# from a Phase-A run (backbone trained with the tokens present-but-frozen).
+train:
+  max_steps: 10000
+  batch_size: 16
+  grad_accum: 1
+  grad_clip: 1.0
+  eval_every: 2500
+  log_every: 500
+  keep_last: 1
+  em: { mode: soft, reassign_every: 0 }
+  lambdas: { sep: 1.0, balance: 0.1, route: 0.5 }
+  token_noise_std: 1.0e-4
+  optimizer: { name: adamw, lr: 1.0e-2, wd: 0.0 }
+  scheduler: cosine
+  wandb: { enabled: false }
