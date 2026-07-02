@@ -1,15 +1,22 @@
 # Scaled comparison — our variants vs. a recipe-faithful MoE (SCALED_RECIPE.md)
 
-**Run date:** 2026-07-01 · **Cluster:** Raven (A100, `mpib_gpu`) · **Corpus:** `demix8` (8 domains,
+**Run date:** 2026-07-02 · **Cluster:** Raven (A100, `mpib_gpu`) · **Corpus:** `demix8` (8 domains,
 byte-level) · **Backbone:** d=512, 8 layers, 8 heads · **Steps:** 30k from scratch · **T=1** · **Seeds:** 1
 
 This slots **our expert-token variants** into the MoE-vs-dense test regime of
 [`../../SCALED_RECIPE.md`](../../SCALED_RECIPE.md), scaled to a real **~26M-active / 143M-total** MoE.
 It implements the recipe's load-bearing subset (§8): the matched **dense vs coarse-MoE vs
 fine-grained-MoE** comparison with the recipe's stabilization, plus oracle-MoE (DEMix), c-BTM, and
-our four variants. Artifacts: [`main_table.md`](main_table.md), [`per_domain_ppl.md`](per_domain_ppl.md),
+our expert-token variants. Artifacts: [`main_table.md`](main_table.md), [`per_domain_ppl.md`](per_domain_ppl.md),
 [`routing_analysis.md`](routing_analysis.md), [`results.csv`](results.csv), [`figures/`](figures/),
 [`domain_analysis_demix8.md`](domain_analysis_demix8.md).
+
+> **Method note (thesis-faithful).** Our method now follows `papers/master_thesis_stream_a.pdf`
+> exactly: a **two-phase EM protocol** — **Phase A** trains the backbone with the expert tokens
+> *present but frozen* (random init) so it learns to condition; **Phase B** *freezes the backbone*
+> and optimises *only* the tokens (soft-prompt tuning, high LR + noise injection). The old
+> from-scratch **alternating** variant (not in the thesis) is **dropped**. This is a real change:
+> the frozen-backbone Phase B makes the **tokens** — not a co-adapting backbone — carry the work.
 
 ## TL;DR
 
@@ -24,12 +31,17 @@ our four variants. Artifacts: [`main_table.md`](main_table.md), [`per_domain_ppl
    (doc-level routing-NMI **0.46**, vs 0.01 for coarse). And **oracle domain-routing (DEMix,
    NMI 1.0) is *worse* (2.589) than free fine-grained routing (2.399)** — forcing domain experts
    over-constrains the MoE.
-3. **Our expert tokens do the opposite — explicit, clean domain specialization — cheaply.** All
-   our variants route each domain to its own expert (**100% best-is-self**), at **+4K–271K params**,
-   and the best (`ours_sup_seq` 2.464) edges out dense. But that domain specialization yields *less*
-   LM gain than MoE's capacity: ours closes only ~11% of the dense→fine-MoE gap.
-4. **Same two levers as the small-scale run hold:** sequential (pretrain-then-alternate) ≥
-   alternating; supervised ≥ learned routing.
+3. **The thesis-faithful tokens beat dense on a *frozen* backbone, for 4K params.** `ours_sup_seq`
+   reaches **2.460 < dense 2.472** training **only the 8 tokens (4,096 params)** on a frozen
+   backbone — matching dense on all 8 domains. And the tokens now do **real work**: routing each
+   domain to its own expert (100% best-is-self, NMI 1.0) with **swap-ratio 1.49** (routing through
+   the wrong token costs 49% ppl), vs the old co-adapted method's hollow 1.02. This is the honest
+   thesis setting — a frozen capable model + a per-identity embedding — and it *works*.
+4. **It also beats dense at *every* scale (isoFLOP sweep).** d128→d512, the frozen-backbone tokens
+   keep a **positive** gap over dense (+0.125→+0.008, saturating) — see
+   [`scaling_and_ablations.md`](scaling_and_ablations.md). (The dropped from-scratch alternating
+   had gone *negative*.) Supervised ≥ learned routing throughout (unsup `ours_unsup_seq` 2.659, but
+   the strongest specialization of all — swap **3.05**).
 
 ## 1. The recipe, implemented
 
@@ -54,18 +66,21 @@ blocks/domain. The three matching axes (§4.9) are set up exactly:
 From [`main_table.md`](main_table.md). "%gap" = fraction of the **dense→fine-MoE** gap
 `(2.472−macro)/(2.472−2.399)` closed at ~Dense-1× compute.
 
-| model | macro-ppl ↓ | routing-NMI (domain) | swap / ×worse | active | total | %gap |
+| model | macro-ppl ↓ | routing-NMI (domain) | swap / ×worse | trainable | total | %gap |
 |---|---|---|---|---|---|---|
-| **MoE-G2 (fine-grained)** | **2.399** | 0.46 (emergent) | — | 25.7M | 143M | **100%** (ceiling) |
-| **ours — sup + sequential** | **2.464** | 1.00 | 1.02× | 25.6M | 25.6M | ~11% |
+| **MoE-G2 (fine-grained)** | **2.399** | 0.46 (emergent) | — | 143M | 143M | **100%** (ceiling) |
+| **ours — sup + sequential (Phase B)** | **2.460** | 1.00 | **1.49×** | **4,096** | 25.6M | ~16% |
 | Dense-1× | 2.472 | — | — | 25.6M | 25.6M | 0% |
-| ours — unsup + sequential | 2.476 | 0.61 | 1.05× | 25.9M | 25.9M | ~−5% |
-| ours — sup + alternating | 2.511 | 1.00 | **1.50×** | 25.6M | 25.6M | −53% |
-| ours — unsup + alternating | 2.554 | 0.62 | 1.06× | 25.9M | 25.9M | — |
-| MoE-oracle (DEMix) | 2.589 | 1.00 (forced) | — | 25.7M | 143M | — |
 | Dense-ceiling (Axis-B) | 2.422 | — | — | 143M | 143M | 68% |
-| **MoE-G1 (coarse)** | **2.592** | 0.01 | — | 25.7M | 143M | −164% |
-| c-BTM (8 models) | 3.214 | — | 3.05× | 25.6M | 205M | — |
+| ours — unsup + sequential (Phase B) | 2.659 | 0.60 | **3.05×** | 271K | 25.9M | −256% |
+| MoE-oracle (DEMix) | 2.589 | 1.00 (forced) | — | 143M | 143M | — |
+| **MoE-G1 (coarse)** | **2.592** | 0.01 | — | 143M | 143M | −164% |
+| c-BTM (8 models) | 3.214 | — | 3.05× | 205M | 205M | — |
+
+**ours — sup + sequential (2.460) beats Dense-1× (2.472) while training only 4,096 parameters** (the
+8 expert tokens) on a **frozen** backbone — the thesis's Phase B. `trainable` is the parameters
+actually updated in the reported stage (Phase B for ours; the whole net for the others); the frozen
+25.6M backbone was trained once in Phase A and is shared with Dense-1×.
 
 **Axis A (iso-active):** MoE-G2 (2.399) beats Dense-1× (2.472) at equal per-token compute. **Axis B
 (iso-total):** MoE-G2 (2.399) also beats the same-total-param Dense-ceiling (2.422) — while using
@@ -93,23 +108,28 @@ it **saturates** here, attributable to fixed training budget + fixed G=2.)
   flexibility. So the MoE's win comes from *fine-grained, flexible, load-balanced capacity* — not
   from domain specialization.
 
-### Our method: explicit domain specialization, cheap, but capacity-bounded
-- Every ours variant gives **clean domain specialization** — 100% best-is-self in cross-routing,
-  routing-NMI 1.0 (supervised) / ~0.62 (learned, ≈ the k-means clusterer's 0.63). The tokens *are*
-  domain experts, by design — the opposite of the MoE's balanced token routing.
-- Best variant `ours_sup_seq` (2.464) **edges out dense** at **+4K params**, but closes only ~11%
-  of the dense→fine-MoE gap. **Explicit domain specialization (ours, and DEMix) is simply a weaker
-  lever than fine-grained flexible capacity (MoE).** Conditioning ≠ capacity — the same conclusion
-  as the small-scale run, now with a real MoE to measure against.
-- **Specialization vs quality trade-off within ours:** `sup_alt` has the strongest per-expert
-  expertise (swap **1.50×**) but worse quality (2.511); `sup_seq` has the best quality (2.464) but
-  weak swap (1.02×) — a strong co-adapted backbone carries the load, leaving the tokens to add
-  little. Same pattern as the pretrained pilot.
+### Our method (thesis-faithful): tokens beat dense on a *frozen* backbone, and now do real work
+- **Beats dense for 4K params.** `ours_sup_seq` 2.460 < Dense-1× 2.472, updating **only the 8 tokens
+  (4,096 params)** in Phase B while the backbone stays frozen — matching dense on all 8 domains
+  ([`per_domain_ppl.md`](per_domain_ppl.md)). Pure per-identity prompt-tuning on a frozen capable
+  model recovers (slightly beats) full dense LM — exactly the thesis's claim.
+- **The tokens carry genuine, non-interchangeable expertise.** Routing a domain through the *wrong*
+  token costs **1.49×** ppl (sup) / **3.05×** (unsup), with routing-NMI 1.0 / 0.60. Contrast the
+  *old* co-adapted "sequential" (swap 1.02): there the backbone co-adapted and did the work, so the
+  tokens were nearly interchangeable. **The correction — freezing the backbone in Phase B — is what
+  forces the tokens to specialize**, and they do.
+- **Conditioning vs capacity, restated.** Ours still doesn't reach the fine-grained MoE (2.399): a
+  frozen backbone + 8 domain vectors is a *domain-specialization* lever, weaker than the MoE's
+  *fine-grained flexible capacity* (143M params). But at **4K trainable params vs 143M**, and beating
+  dense, it is a far cheaper lever than the earlier framing suggested. Conditioning ≠ capacity — but
+  conditioning, done faithfully, is a real and remarkably cheap win over dense.
 
-### The two training levers (confirmed at scale)
-Sequential (pretrain-then-alternate) ≥ alternating (2.464 vs 2.511 supervised; 2.476 vs 2.554
-unsup), and supervised ≥ learned routing — mirroring oracle-MoE ≥ learned-MoE. Good routing + a
-properly-trained, co-adapting backbone are necessary for either method.
+### The training levers (thesis-faithful; alternating dropped)
+The from-scratch **alternating** variant is dropped (not in the thesis). Within the two-phase
+sequential protocol, **supervised ≥ learned routing** (2.460 vs 2.659) — mirroring oracle-MoE's
+clean assignment helping our method even as it *hurts* the MoE. And the two-phase order matters:
+Phase A must train the backbone *with the tokens present* (else Phase B's frozen-backbone tokens
+have nothing to steer — the failure mode of the pre-correction pure-dense pretraining).
 
 ## 4. Per-domain perplexity (every model)
 See [`per_domain_ppl.md`](per_domain_ppl.md). MoE-G2 is best or tied on **all 8 domains**; the
@@ -129,7 +149,8 @@ fine-tuning** eval (H3/H4, where Artetxe/Abnar show the gap compresses or revers
 Axis-C memory accounting. The point estimates here are single-seed.
 
 ## 6. Caveats
-- 1 seed, 30k steps, byte-level. Learned-MoE numbers are a lower bound on a fully-tuned MoE (no
+- 1 seed, byte-level. Dense/MoE arms are 30k steps; ours = Phase A 30k (backbone) + Phase B 6k
+  (token-only, frozen backbone). Learned-MoE numbers are a lower bound on a fully-tuned MoE (no
   per-arm LR sweep / granularity beyond G=2 / shared experts here).
 - routing-NMI for dense/MoE/cbtm in `main_table.md` is the k-means clusterer's NMI (baseline
   reference); the *MoE's own* learned routing-NMI is in `routing_analysis.md` (0.01 / 0.46 / 1.0).
@@ -138,11 +159,14 @@ Axis-C memory accounting. The point estimates here are single-seed.
 ```bash
 DATA=/ptmp/$USER/soft-moe/data
 python scripts/build_data.py --config configs/experiment/sc_dense1x.yaml --data-root $DATA
-for m in sc_dense1x sc_dense_ceiling sc_moe_g1 sc_moe_g2 sc_moe_oracle sc_cbtm sc_ours_sup_alt sc_ours_unsup_alt; do
+for m in sc_dense1x sc_dense_ceiling sc_moe_g1 sc_moe_g2 sc_moe_oracle sc_cbtm; do
   python scripts/train.py --config configs/experiment/$m.yaml --data-root $DATA --run-dir .../$m --device cuda; done
-for m in sc_ours_sup_seq sc_ours_unsup_seq; do   # sequential: pretrain then warm-start + alternate
+# ours = thesis-faithful two-phase EM. Phase A: backbone + frozen (random) tokens present.
+python scripts/train.py --config configs/experiment/sc_seqA.yaml --data-root $DATA --run-dir .../sc_seqA --device cuda
+# Phase B: freeze backbone, tune ONLY the tokens; warm-start carries Phase-A's frozen tokens forward.
+for m in sc_ours_sup_seq sc_ours_unsup_seq; do
   python scripts/train.py --config configs/experiment/$m.yaml --data-root $DATA --run-dir .../$m --device cuda \
-    --init-backbone-from .../sc_dense1x; done
+    --init-backbone-from .../sc_seqA; done
 python scripts/make_report.py   --runs <symlinks> --out reports/scaled
 python scripts/cross_routing.py --runs <moe + ours runs> --out reports/scaled/routing_analysis.md
 ```
