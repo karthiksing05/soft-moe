@@ -10,4 +10,5 @@ model:
   expert_tokens: { n_experts: auto, tokens_per_expert: 2, init: random, trainable: true }
   router: { kind: soft, top_k: 1, pool: meanhidden }
   router_supervise_with: cluster
+train: { max_steps: 6000, eval_every: 2000 }
 seed: 0
