@@ -75,7 +75,11 @@ class FFNGovernor(nn.Module):
     @staticmethod
     def _zero_head(d_in: int, d_out: int) -> nn.Linear:
         lin = nn.Linear(d_in, d_out)
-        nn.init.zeros_(lin.weight); nn.init.zeros_(lin.bias)   # identity modulation at init
+        # tiny NON-zero weight (bias zero) => near-identity at init AND a live gradient path from e_k,
+        # so the per-expert signal can't get stuck at zero (a cold-start 'dead governor' the pure
+        # zero-init hit at d512: the global bias trained but the per-expert weight never escaped 0,
+        # giving swap-ratio 1.0). 1e-3 keeps the initial gate within ~0.1% of identity.
+        nn.init.normal_(lin.weight, std=1e-3); nn.init.zeros_(lin.bias)
         return lin
 
     @staticmethod
