@@ -1,12 +1,13 @@
-# T-ablation: unsup_seq with tokens_per_expert=4 (T=1 is the sc_ours_unsup_seq run).
-defaults: [/data/demix8, /train/sc_warm_alt, /eval/default]
+# T-ablation (thesis-faithful sequential Phase B): unsup_seq, tokens_per_expert=4.
+# Warm-start from sc_seqA via --init-backbone-from (T=1 is sc_ours_unsup_seq).
+defaults: [/data/demix8, /train/sc_phaseB, /eval/default]
 meta: { name: tab_ours_unsup_seq_T4, regime: ours_unsup_seq_T4 }
 model:
   method: softmoe
-  backbone_mode: full
+  backbone_mode: frozen
   injection: prefix
   backbone: { kind: tiny, tiny: { n_embd: 512, n_layer: 8, n_head: 8, n_inner: 2048, n_positions: 576 } }
-  expert_tokens: { n_experts: auto, tokens_per_expert: 4, init: from_cluster_centroids, trainable: true }
+  expert_tokens: { n_experts: auto, tokens_per_expert: 4, init: random, trainable: true }
   router: { kind: soft, top_k: 1, pool: meanhidden }
   router_supervise_with: cluster
 seed: 0

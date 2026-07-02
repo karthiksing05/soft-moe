@@ -25,18 +25,15 @@ FAMILY = {  # method -> (family, pretty label)
     "dense_1x": ("dense", "Dense-1×"), "dense_ceiling": ("dense", "Dense-ceiling"),
     "moe_g1": ("moe", "MoE-G1 (coarse)"), "moe_g2": ("moe", "MoE-G2 (fine)"),
     "moe_oracle": ("moe", "MoE-oracle (DEMix)"), "cbtm": ("cbtm", "c-BTM"),
-    "ours_sup_alt": ("ours", "ours sup+alt"), "ours_sup_seq": ("ours", "ours sup+seq"),
-    "ours_unsup_alt": ("ours", "ours unsup+alt"), "ours_unsup_seq": ("ours", "ours unsup+seq"),
+    "ours_sup_seq": ("ours", "ours sup+seq"), "ours_unsup_seq": ("ours", "ours unsup+seq"),
 }
 FAM_COLOR = {"dense": "#888888", "moe": "#d62728", "ours": "#1f77b4", "cbtm": "#2ca02c"}
 
 # domain routing-NMI: MoE = its *learned* routing (routing_analysis.md); ours = main-table routing-NMI
 DOMAIN_NMI = {"moe_g1": 0.009, "moe_g2": 0.462, "moe_oracle": 1.000,
-              "ours_sup_alt": 1.000, "ours_sup_seq": 1.000,
-              "ours_unsup_alt": 0.621, "ours_unsup_seq": 0.613}
+              "ours_sup_seq": 1.000, "ours_unsup_seq": 0.613}
 # cross-routing ×worse-through-wrong-expert (routing_analysis.md), expert methods only
-XWORSE = {"cbtm": 3.05, "ours_sup_alt": 1.48, "ours_unsup_alt": 1.06,
-          "ours_sup_seq": 1.02, "ours_unsup_seq": 1.02}
+XWORSE = {"cbtm": 3.05, "ours_sup_seq": 1.02, "ours_unsup_seq": 1.02}
 
 
 def load_results() -> dict:

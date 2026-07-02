@@ -10,7 +10,7 @@ from pathlib import Path
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-METHODS = ["sup_alt", "unsup_alt", "sup_seq", "unsup_seq"]
+METHODS = ["sup_seq", "unsup_seq"]  # alternating dropped (not in the thesis)
 Ts = [1, 2, 4]
 
 
