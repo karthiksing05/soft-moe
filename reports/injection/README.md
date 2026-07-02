@@ -102,12 +102,17 @@ loss == dense loss). `injection: film_ffn | spectral_ffn`.
   a basis `U`, scale the `r` principal directions by the token, project back). Governs *directions of
   the weight image* — the literal "soft-expert subspace governance."
 
-| mechanism | macro-ppl ↓ | micro-ppl ↓ | swap-ratio ↑ | Δ vs prefix | extra shared params |
-|---|---|---|---|---|---|
-| prefix (input) | 2.949 | 2.828 | 1.532 | — | 0 |
-| token (input) | 2.961 | 2.838 | 1.512 | +0.012 | 0 |
-| **film_ffn** | 2.920 | 2.800 | 1.436 | **−0.029** | +1.58M |
-| **spectral_ffn** | **2.915** | **2.796** | **1.575** | **−0.034** | **+123K** |
+| mechanism | site | macro-ppl ↓ | micro-ppl ↓ | swap-ratio ↑ | Δ vs prefix | extra shared params |
+|---|---|---|---|---|---|---|
+| prefix (input) | — | 2.949 | 2.828 | 1.532 | — | 0 |
+| token (input) | — | 2.961 | 2.838 | 1.512 | +0.012 | 0 |
+| **film_ffn** | FFN neurons | 2.920 | 2.800 | 1.436 | −0.029 | +1.58M |
+| **spectral_ffn** | FFN subspace | 2.915 | 2.796 | 1.575 | −0.034 | +123K |
+| **spectral_ffn + attn** | FFN + attn subspace | **2.902** | **2.786** | **1.588** | **−0.047** | +172K |
+
+A clean monotone ladder off the input rung: **prefix 2.949 → film 2.920 → spectral 2.915 →
+spectral+attn 2.902**. Governing more of the block (attention *and* FFN) helps further, and the
+swap-ratio *rises* at each step (1.53 → 1.59) — the tokens carry progressively more of the work.
 
 **Findings.**
 1. **Moving off the input rung works.** Both governance modes beat prefix/token on **all 8 domains**
@@ -119,14 +124,17 @@ loss == dense loss). `injection: film_ffn | spectral_ffn`.
    FFN is both more parameter-efficient and more effective than gating individual neurons — evidence
    that experts want to own *directions of the weight matrix*, not axis-aligned units. This is the
    "subspace governance" thesis, confirmed.
-3. **The specialization ↔ shared-capacity trade-off (again).** `spectral_ffn` has the **highest
-   swap-ratio (1.575)** — its small hypernet forces the *tokens* to carry the specialization —
-   whereas `film_ffn`'s large 1.58M hypernet absorbs the work and leaves the tokens weaker
-   (swap 1.436, the lowest). Same lesson as freezing the backbone in Phase B: constrain the shared
-   machinery and the expert latents do more.
-4. Still below the fine-grained MoE (a d256 MoE-G2 ≈ mid-2.7s→low; the gap remains capacity, not
-   injection site) — but governance is the right *direction*: `spectral_ffn` is the flagship to scale
-   up (d512, higher `governor_rank`, and gating attention as well as the FFN).
+3. **Governing attention too helps.** Extending the spectral gate to each block's attention output
+   (`govern_attn`, `spectral_ffn + attn`) is the best of all — 2.902, and the **highest swap-ratio
+   (1.588)** — for +49K params over FFN-only. The expert benefits from governing *both* the mixing
+   (attention) and the transform (FFN).
+4. **The specialization ↔ shared-capacity trade-off (again).** Swap-ratio *rises* monotonically up
+   the ladder (prefix 1.532 → spectral 1.575 → +attn 1.588), while `film_ffn`'s large 1.58M hypernet
+   absorbs the work and leaves the tokens weakest (swap 1.436). Same lesson as freezing the backbone
+   in Phase B: constrain the shared machinery and the expert latents do more.
+5. Still below the fine-grained MoE (a d256 MoE-G2 ≈ mid-2.7s; the gap remains capacity, not
+   injection site) — but governance is the right *direction*. **d512 scale-up vs the real
+   dense/MoE/prefix baselines is in [`../governance_d512/`](../governance_d512/)** (§5).
 
 ## Reproduce
 ```bash
