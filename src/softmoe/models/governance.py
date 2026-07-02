@@ -1,17 +1,22 @@
-"""FFN **subspace governance** — condition each block's feed-forward network on the EM expert token.
+"""FFN (and optionally attention) **subspace governance** — condition the backbone's per-block
+computation on the EM expert token.
 
 This is the MoE-structured realisation of "soft-expert subspace governance": where the recipe-faithful
 MoE partitions the FFN hidden dim into experts and *routes tokens* to a subset, here a compact
 per-expert latent ``e_k`` (the ``ExpertTokenBank``, EM-trained) drives a **shared hypernetwork** that
-emits, per layer, a modulation of that same FFN hidden space. The backbone + hypernet are the
-governance mechanism (trained in Phase A); ``e_k`` is fit in Phase B — so the token stays a token.
+emits, per layer, a modulation of that same FFN hidden space (and optionally the attention output).
+The backbone + hypernet are the governance mechanism (trained in Phase A); ``e_k`` is fit in Phase B
+— so the token stays a token.
 
-Two modes:
-- ``film``     — per-neuron multiplicative gate ``h ⊙ g_k`` on the FFN hidden (the soft, token-routed
-                 analog of the MoE selecting FFN experts / neuron blocks).
-- ``spectral`` — gate a learned ``r``-dim orthonormal subspace of the FFN hidden: rotate onto a basis
-                 ``U``, scale ``r`` principal directions by the token, rotate back. Governs *directions
-                 of the weight image* rather than axis-aligned neurons.
+Two modes, at one or two sites:
+- ``film``     — per-unit multiplicative gate ``h ⊙ g_k`` (the soft, token-routed analog of the MoE
+                 selecting FFN experts / neurons).
+- ``spectral`` — gate a learned ``r``-dim orthonormal subspace: rotate onto a basis ``U``, scale ``r``
+                 principal directions by the token, rotate back. Governs *directions of the layer's
+                 output* rather than axis-aligned units.
+- ``govern_attn`` additionally applies the same modulation to each block's **attention output
+                 projection** (the d_model residual contribution), so the expert governs *both* the
+                 mixing (attention) and the transform (FFN).
 
 Both are **identity at init** (zero-init hypernet), so Phase A starts from the dense backbone.
 """
@@ -22,12 +27,21 @@ import torch
 import torch.nn as nn
 
 
-def ffn_act_modules(backbone) -> list[nn.Module]:
-    """The per-block FFN activation modules whose output is the ``d_ff`` hidden (GPT-2 family)."""
+def _blocks(backbone):
     tr = getattr(backbone, "transformer", None)
     if tr is None or not hasattr(tr, "h"):
-        raise ValueError("FFN governance currently supports GPT-2-style backbones (transformer.h).")
-    return [blk.mlp.act for blk in tr.h]
+        raise ValueError("Governance currently supports GPT-2-style backbones (transformer.h).")
+    return tr.h
+
+
+def ffn_act_modules(backbone) -> list[nn.Module]:
+    """Per-block FFN activation modules whose output is the ``d_ff`` hidden (GPT-2 family)."""
+    return [blk.mlp.act for blk in _blocks(backbone)]
+
+
+def attn_proj_modules(backbone) -> list[nn.Module]:
+    """Per-block attention output projections whose output is the ``d_model`` residual contribution."""
+    return [blk.attn.c_proj for blk in _blocks(backbone)]
 
 
 def ffn_hidden_size(backbone) -> int:
@@ -36,51 +50,71 @@ def ffn_hidden_size(backbone) -> int:
 
 
 class FFNGovernor(nn.Module):
-    def __init__(self, d_model: int, d_ff: int, n_layers: int, mode: str = "film", rank: int = 16):
+    def __init__(self, d_model: int, d_ff: int, n_layers: int, mode: str = "film",
+                 rank: int = 16, govern_attn: bool = False):
         super().__init__()
+        if mode not in ("film", "spectral"):
+            raise ValueError(f"Unknown governance mode '{mode}' (film|spectral).")
         self.mode = mode
         self.n_layers = n_layers
-        self.d_ff = d_ff
         self.rank = int(rank)
-        self.gate_out = d_ff if mode == "film" else self.rank
-        # shared hypernet e_k -> per-layer gate params. Zero-init => identity modulation at start.
-        self.proj = nn.Linear(d_model, n_layers * self.gate_out)
-        nn.init.zeros_(self.proj.weight)
-        nn.init.zeros_(self.proj.bias)
+        self.govern_attn = bool(govern_attn)
+        self._cur = {}  # site -> [n_layers, B, gate_out]
+
+        # one head (+ basis for spectral) per site. FFN site gates the d_ff hidden; attn the d_model.
+        self.ffn_gate_out = d_ff if mode == "film" else self.rank
+        self.proj_ffn = self._zero_head(d_model, n_layers * self.ffn_gate_out)
         if mode == "spectral":
-            U = torch.empty(n_layers, d_ff, self.rank)
-            for l in range(n_layers):
-                nn.init.orthogonal_(U[l])
-            self.U = nn.Parameter(U)
-        elif mode != "film":
-            raise ValueError(f"Unknown governance mode '{mode}' (film|spectral).")
-        self._cur = None  # per-layer gate for the current batch: [n_layers, B, gate_out]
+            self.U_ffn = nn.Parameter(self._ortho_basis(n_layers, d_ff, self.rank))
+        if self.govern_attn:
+            self.attn_gate_out = d_model if mode == "film" else self.rank
+            self.proj_attn = self._zero_head(d_model, n_layers * self.attn_gate_out)
+            if mode == "spectral":
+                self.U_attn = nn.Parameter(self._ortho_basis(n_layers, d_model, self.rank))
+
+    @staticmethod
+    def _zero_head(d_in: int, d_out: int) -> nn.Linear:
+        lin = nn.Linear(d_in, d_out)
+        nn.init.zeros_(lin.weight); nn.init.zeros_(lin.bias)   # identity modulation at init
+        return lin
+
+    @staticmethod
+    def _ortho_basis(n_layers: int, dim: int, rank: int) -> torch.Tensor:
+        U = torch.empty(n_layers, dim, rank)
+        for l in range(n_layers):
+            nn.init.orthogonal_(U[l])
+        return U
 
     def attach(self, backbone) -> None:
         for l, act in enumerate(ffn_act_modules(backbone)):
-            act.register_forward_hook(self._make_hook(l))
+            act.register_forward_hook(self._make_hook("ffn", l, getattr(self, "U_ffn", None)))
+        if self.govern_attn:
+            for l, cp in enumerate(attn_proj_modules(backbone)):
+                cp.register_forward_hook(self._make_hook("attn", l, getattr(self, "U_attn", None)))
 
-    def _make_hook(self, l: int):
+    def _make_hook(self, site: str, l: int, U):
         def hook(_module, _inp, out):
-            if self._cur is None:
+            cur = self._cur.get(site)
+            if cur is None:
                 return out
-            g = self._cur[l]                                   # [B, gate_out]
+            g = cur[l]                                          # [B, gate_out]
             if self.mode == "film":
-                return out * (2.0 * torch.sigmoid(g)).unsqueeze(1)      # init 1.0 => identity
-            U = self.U[l]                                      # [d_ff, r]
-            c = out @ U                                        # [B, L, r]  project onto subspace
-            s = (2.0 * torch.sigmoid(g) - 1.0).unsqueeze(1)    # [B, 1, r]  init 0 => identity
-            return out + (c * s) @ U.t()                       # rotate+scale r principal directions
+                return out * (2.0 * torch.sigmoid(g)).unsqueeze(1)         # init 1.0 => identity
+            Ul = U[l]                                           # [dim, r]
+            c = out @ Ul                                        # [B, L, r]  project onto subspace
+            s = (2.0 * torch.sigmoid(g) - 1.0).unsqueeze(1)     # [B, 1, r]  init 0 => identity
+            return out + (c * s) @ Ul.t()                       # rotate+scale r principal directions
         return hook
 
     def set_current(self, e: torch.Tensor) -> None:
-        """``e``: [B, d_model] routed expert vectors -> stash per-layer gates for the coming forward."""
+        """``e``: [B, d_model] routed expert vectors -> stash per-site, per-layer gates."""
         B = e.shape[0]
-        g = self.proj(e).view(B, self.n_layers, self.gate_out).transpose(0, 1)
-        self._cur = g
+        self._cur = {"ffn": self.proj_ffn(e).view(B, self.n_layers, self.ffn_gate_out).transpose(0, 1)}
+        if self.govern_attn:
+            self._cur["attn"] = self.proj_attn(e).view(B, self.n_layers, self.attn_gate_out).transpose(0, 1)
 
     def clear(self) -> None:
-        self._cur = None
+        self._cur = {}
 
     def num_params(self, trainable_only: bool = False) -> int:
         ps = [p for p in self.parameters() if (p.requires_grad or not trainable_only)]
