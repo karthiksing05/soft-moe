@@ -1,4 +1,21 @@
-# Injecting the expert: soft **prefix** vs inline **token** (conversational-FT style)
+# How to inject the expert: input injection vs FFN **subspace governance**
+
+Four ways to hand the same EM-trained per-expert latent `e_k` to the backbone, all under the
+identical two-phase recipe (only the injection mechanism differs). **Headline:** letting the expert
+**govern an FFN subspace** beats prepending it as a prefix or a token on all 8 domains — and the
+**spectral** variant wins most efficiently.
+
+| mechanism | rung | macro-ppl ↓ | swap-ratio ↑ | extra shared params |
+|---|---|---|---|---|
+| `prefix` (soft-prompt) | input | 2.949 | 1.532 | 0 |
+| `token` (inline, predict-marker) | input | 2.961 | 1.512 | 0 |
+| **`film_ffn`** (FFN neuron gate) | FFN activation | **2.920** | 1.436 | +1.58M |
+| **`spectral_ffn`** (FFN subspace gate) | FFN subspace | **2.915** | **1.575** | **+123K** |
+
+All: d256, `demix8`, T=1, supervised routing, 2,048 token params. See §1–2 for the input arms,
+**§4 for governance**. Code: `src/softmoe/models/{soft_moe,governance}.py`.
+
+## The two input-injection arms (prefix vs token)
 
 **Question.** Our method delivers each expert as a **soft prefix** — a learned vector prepended to
 the input embeddings (`injection: prefix`). The thesis (`papers/master_thesis_stream_a.pdf`) and
@@ -69,11 +86,59 @@ such context, so the inline-token and soft-prefix mechanisms collapse to the sam
    Reach for `injection: token` + `token_predict_marker` only when the identity should be *inferred
    and emitted* as part of generation — i.e. genuine conversational persona modeling.
 
+## 4. Beyond input injection: **FFN subspace governance** (MoE-structured)
+
+Prefix and token both sit at the **input rung** — the expert only *conditions via attention* to a
+front vector. The MoE's advantage came from **fine-grained FFN capacity**, so the natural next step
+is to let the expert govern the **FFN hidden space** directly, where MoE experts live. Both variants
+keep `e_k` as the compact latent and route it through a **shared hypernetwork** (`FFNGovernor`) that
+emits, per layer, a modulation of the FFN hidden — the backbone+hypernet are the governance
+mechanism (Phase A), `e_k` is fit in Phase B. Zero-init ⇒ identity at start (verified: governed
+loss == dense loss). `injection: film_ffn | spectral_ffn`.
+
+- **`film_ffn`** — per-neuron multiplicative gate `h ⊙ g_k` on the FFN hidden. The soft, token-routed
+  analog of the MoE selecting FFN experts/neurons: the expert governs *which neurons fire*.
+- **`spectral_ffn`** — gate a learned `r=16`-dim orthonormal subspace of the FFN hidden (project onto
+  a basis `U`, scale the `r` principal directions by the token, project back). Governs *directions of
+  the weight image* — the literal "soft-expert subspace governance."
+
+| mechanism | macro-ppl ↓ | micro-ppl ↓ | swap-ratio ↑ | Δ vs prefix | extra shared params |
+|---|---|---|---|---|---|
+| prefix (input) | 2.949 | 2.828 | 1.532 | — | 0 |
+| token (input) | 2.961 | 2.838 | 1.512 | +0.012 | 0 |
+| **film_ffn** | 2.920 | 2.800 | 1.436 | **−0.029** | +1.58M |
+| **spectral_ffn** | **2.915** | **2.796** | **1.575** | **−0.034** | **+123K** |
+
+**Findings.**
+1. **Moving off the input rung works.** Both governance modes beat prefix/token on **all 8 domains**
+   (per-domain macro 2.91–2.92 vs 2.95–2.96). Letting the expert govern an FFN subspace, rather than
+   prepend a vector, is a real — if modest (~1.2%) — and consistent gain. This is the first
+   mechanism to beat the input-injection ceiling.
+2. **Spectral wins, and wins cheaply.** `spectral_ffn` is the best (2.915) *and* uses **13× fewer**
+   shared params than `film_ffn` (+123K vs +1.58M). Gating rotated **principal directions** of the
+   FFN is both more parameter-efficient and more effective than gating individual neurons — evidence
+   that experts want to own *directions of the weight matrix*, not axis-aligned units. This is the
+   "subspace governance" thesis, confirmed.
+3. **The specialization ↔ shared-capacity trade-off (again).** `spectral_ffn` has the **highest
+   swap-ratio (1.575)** — its small hypernet forces the *tokens* to carry the specialization —
+   whereas `film_ffn`'s large 1.58M hypernet absorbs the work and leaves the tokens weaker
+   (swap 1.436, the lowest). Same lesson as freezing the backbone in Phase B: constrain the shared
+   machinery and the expert latents do more.
+4. Still below the fine-grained MoE (a d256 MoE-G2 ≈ mid-2.7s→low; the gap remains capacity, not
+   injection site) — but governance is the right *direction*: `spectral_ffn` is the flagship to scale
+   up (d512, higher `governor_rank`, and gating attention as well as the FFN).
+
 ## Reproduce
 ```bash
-# prefix arm already exists as the isoFLOP-sweep d256 point (sw_seqA_d256 -> sw_ours_d256_s0).
+# input arms
 python scripts/train.py --config configs/experiment/inj_seqA_token_d256.yaml --run-dir .../inj_seqA_token_d256 --device cuda
-python scripts/train.py --config configs/experiment/inj_token_d256.yaml --run-dir .../inj_token_d256 --device cuda \
-  --init-backbone-from .../inj_seqA_token_d256
-python scripts/make_report.py --runs <dir symlinking {sw_ours_d256_s0, inj_token_d256}> --out reports/injection
+python scripts/train.py --config configs/experiment/inj_token_d256.yaml --run-dir .../inj_token_d256 \
+  --device cuda --init-backbone-from .../inj_seqA_token_d256
+# governance arms (film | spectral): Phase A trains backbone+hypernet, Phase B fits only e_k
+for s in film spectral; do
+  python scripts/train.py --config configs/experiment/govern_seqA_${s}_d256.yaml --run-dir .../govern_seqA_${s}_d256 --device cuda
+  python scripts/train.py --config configs/experiment/govern_${s}_d256.yaml --run-dir .../govern_${s}_d256 \
+    --device cuda --init-backbone-from .../govern_seqA_${s}_d256
+done
+python scripts/make_report.py --runs <dir symlinking the 4 runs> --out reports/injection
 ```
