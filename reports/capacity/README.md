@@ -15,7 +15,7 @@ numerically identical.)
 | **MoE granularity** | G1 (coarse) | 2.592 | — | 143M |
 | | G2 | 2.399 | — | 143M |
 | | **G4** | **2.383** | — | 143M |
-| | G8 | *(running)* | — | 143M |
+| | G8 | 2.392 | — | 143.7M |
 | **governance rank** | r16 | 2.446 | 1.643 | 26.1M |
 | | r64 | 2.444 | 1.648 | 27.5M |
 | | r128 | 2.442 | 1.723 | 29.3M |
@@ -28,9 +28,12 @@ numerically identical.)
    **specialization** (swap-ratio 1.643→1.723) — the tokens carve ever-finer per-expert subspaces —
    but the fixed FFN has no more to express, so **quality doesn't move**. The bottleneck is capacity,
    not conditioning.
-2. **MoE fine-graining keeps paying.** G1 2.592 → G2 2.399 → **G4 2.383**: the granularity lever adds
-   real per-token capacity and keeps improving (diminishing, but monotone). **G4 is the best model
-   here**, and it sits *below* the entire governance rank ladder.
+2. **MoE fine-graining pays until an optimum.** G1 2.592 → G2 2.399 → **G4 2.383** → G8 2.392: the
+   granularity lever adds real per-token capacity, peaking at **G4** and then *over-fragmenting* at
+   G8 (64 experts of width 256 — too narrow to use, the known granularity-optimum from
+   Krajewski 2024). Even so, **every MoE granularity (including the G8 over-shoot) sits below the
+   entire governance rank ladder** — the capacity floor is fundamentally lower than the conditioning
+   ceiling.
 3. **This is the value of the MoE, quantified.** The two levers are **orthogonal**: conditioning
    (rank) *saturates* at ~2.44; capacity (granularity) *scales* past it to 2.383. The MoE's added
    capacity buys **~0.06 ppl below governance's ceiling** — a floor that conditioning a fixed FFN
