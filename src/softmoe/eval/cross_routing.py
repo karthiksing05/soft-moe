@@ -19,28 +19,20 @@ import torch
 from torch.utils.data import DataLoader
 
 from softmoe.data.dataset import Collator
-from softmoe.models.baselines.cbtm import CBTM
 from softmoe.models.soft_moe import SoftMoE
-from softmoe.training.losses import causal_lm_loss
 
 
 def _n_experts(model) -> int:
     if isinstance(model, SoftMoE):
         return model.tokens.n_experts
-    if isinstance(model, CBTM):
-        return model.n_experts
-    raise ValueError("cross-routing needs per-document experts (SoftMoE or c-BTM).")
+    raise ValueError("cross-routing needs per-document experts (SoftMoE).")
 
 
 def _forced_expert_nll(model, batch, k: int) -> torch.Tensor:
     """Per-example NLL when every input in the batch is forced through expert ``k``."""
-    if isinstance(model, SoftMoE):
-        ids = torch.full_like(batch["domain_id"], k)
-        per_ex, _ = model._single_expert_forward(batch, ids)
-        return per_ex
-    # c-BTM: expert k is its own backbone
-    out = model.experts[k](input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
-    return causal_lm_loss(out.logits, batch["labels"], reduction="per_example")
+    ids = torch.full_like(batch["domain_id"], k)
+    per_ex, _ = model._single_expert_forward(batch, ids)
+    return per_ex
 
 
 @torch.no_grad()

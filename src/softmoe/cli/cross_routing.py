@@ -16,7 +16,6 @@ import torch
 from softmoe.data.dataset import load_dataset_split
 from softmoe.eval.cross_routing import expert_domain_matrix, render_markdown
 from softmoe.eval.harness import load_run_model
-from softmoe.models.baselines.cbtm import CBTM
 from softmoe.models.soft_moe import SoftMoE
 from softmoe.utils.logging import get_logger
 
@@ -36,7 +35,7 @@ def analyze_run(run_dir: str, data_root: str, device: str) -> tuple[str | None, 
     pad = int(cfg.get_path("data.pad_token_id", 0) or 0)
     bs = int(cfg.get_path("eval.batch_size", 8))
 
-    if isinstance(model, (SoftMoE, CBTM)):
+    if isinstance(model, SoftMoE):
         rep = expert_domain_matrix(model, test, device=device, batch_size=bs, pad_token_id=pad)
         s = rep["summary"]
         logger.info("[routing] %-14s gap=%.2fx best-is-self=%.0f%%", regime,
