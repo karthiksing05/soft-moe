@@ -1,107 +1,108 @@
-# Soft-MoE — EM-discovered expert tokens in a single LLM
+# EM expert-token finetuning vs. Mixture-of-Experts
 
-How can a single language-model backbone be **softly partitioned into experts** by conditioning
-on a small bank of learned *expert tokens* (soft prompts), with the assignment of inputs to
-experts fit by **Expectation–Maximization** — instead of training N separate expert models (MoE,
-c-BTM) or adding parameter-heavy expert FFNs?
+When do you actually **need** a Mixture-of-Experts? This repo contrasts the **EM-style
+expert-token finetuning** scheme from `papers/master_thesis_stream_a.pdf` — which conditions a
+*single* shared backbone on a small bank of EM-trained *expert tokens* — against the two obvious
+alternatives:
 
-The experts share one backbone; expertise is carried by the token `e_k`, not by separate weights.
-This repo implements the full research loop — **data → EM training → evaluation** — for that idea,
-its two regimes (supervised / unsupervised), and five baselines, all behind one config-driven CLI.
+- **the standard MoE** — genuine per-expert FFN *capacity* (parameter-heavy, sparse routing), and
+- **general finetuning** — one dense model trained on all the data (full fine-tuning).
 
-See [`BRAINSTORM.md`](BRAINSTORM.md) for the seed idea and [`plan/`](plan/) for the full design:
-[`plan/README.md`](plan/README.md) (build order), [`plan/THEORY.md`](plan/THEORY.md) (methodology,
-design space, literature review), and the three stage docs
-([01 data](plan/01-data-collection.md), [02 training](plan/02-training.md),
-[03 evaluation](plan/03-evaluation.md)).
+The goal is a setting where the MoE's capacity is *necessary*, and a clean read on what the EM
+method buys instead: near-free **specialization** on a fixed backbone.
 
-## Install
+## The experiment (`configs/experiment/*_d256.yaml`)
 
-```bash
-python -m venv .venv --system-site-packages   # reuse a system torch if present
-.venv/bin/python -m pip install -e ".[dev]"
-# optional extras: ".[embed]" (sentence-transformers), ".[cobweb]", ".[wandb]"
+A **capacity-constrained** byte-level backbone (d=256, 6 layers) on **`demix8`** — 8 distinct
+domains (wiki, news, reviews, arxiv, pubmed, math, legal, stories). Capacity-constrained on purpose:
+at this size a single dense model cannot comfortably hold all 8 domains, so the MoE's extra capacity
+has room to matter. Four methods, matched compute:
+
+| method | what it is | trained params |
+|---|---|---|
+| **dense** (`dense_d256`) | general finetuning — one dense model on all domains | full backbone |
+| **MoE** (`moe_d256`) | standard fine-grained MoE (G=2, 16 experts, top-2) | full backbone + experts (~3× total) |
+| **EM-prefix** (`em_prefix_d256`) | thesis persona/expert tokens, injected as a **prefix** | **only the tokens** (frozen backbone) |
+| **EM-governance** (`em_gov_d256`) | expert tokens that **govern an FFN+attention subspace** (spectral) | **only the tokens** (frozen backbone) |
+
+The EM methods are the thesis's **two-phase protocol**: **Phase A** (`*_seqA_*`) trains the backbone
+with the expert tokens present-but-frozen; **Phase B** freezes the backbone and fits *only* the
+tokens. EM-governance is the best-performing realization; EM-prefix is the literal-thesis reference.
+
+## Results
+
+Filled from [`reports/comparison/`](reports/comparison/) (macro-perplexity ↓, and **swap-ratio** =
+how much routing a domain through the *wrong* expert costs — a direct measure of specialization).
+
+| method | macro-ppl ↓ | swap-ratio ↑ | routing-NMI ↑ | total params |
+|---|---|---|---|---|
+| **MoE (standard)** | **2.69** | — | — | ~14M |
+| EM-governance | 2.90 | ~1.6 | 1.00 | ~5M |
+| EM-prefix | 2.95 | ~1.5 | 1.00 | ~5M |
+| dense (full FT) | 2.97 | — | — | ~5M |
+
+*(numbers refreshed by the comparison job; see `reports/comparison/main_table.md`.)*
+
+**Three findings.**
+
+1. **The MoE is necessary — for capacity.** It is far ahead (2.69 vs 2.97 dense), a gap *no amount of
+   conditioning closes*, because the gap is capacity: the MoE adds real per-expert FFN parameters
+   (~3× total) and sparse routing. Neither the EM tokens nor full-FT can reach it on a fixed backbone.
+   (A prior rank/granularity study confirmed this is a hard ceiling: growing the EM governor's rank
+   8× moves perplexity by <0.01, while MoE granularity keeps improving.)
+2. **The EM method beats full finetuning — for near-free, and with *specialization full-FT lacks*.**
+   Both EM variants edge out dense while training **only the expert tokens** on a frozen backbone,
+   and every domain routes to its own expert (**routing-NMI 1.0**, swap-ratio ~1.5–1.6: sending a
+   domain through the wrong token costs 50–60% perplexity). Full-FT and the MoE have *no* such
+   interpretable per-domain structure — the MoE's routing is balanced/emergent, not domain-aligned.
+3. **Governance > prefix.** Letting the token govern an FFN/attention *subspace* beats prepending it
+   as a prefix (2.90 vs 2.95), with stronger specialization.
+
+**The trade-off, in one line:** the **MoE buys capacity** (best quality, no interpretable
+specialization); the **EM method buys specialization** (clean per-domain experts, near-free, on a
+frozen backbone) but not capacity; **full finetuning buys neither**.
+
+## How the expert token works (mechanistic interp)
+
+[`reports/comparison/mech_interp/`](reports/comparison/mech_interp/) — measured as *token-on vs -off*:
+
+- **Acts more deeply with depth** — the residual-stream shift grows layer-by-layer (the token lightly
+  nudges early features, increasingly reshapes late, domain-specific ones).
+- **Each domain governs a distinct subspace** — cross-expert gate overlap goes negative deep in the
+  net (domains use *anti-correlated* FFN directions); the specialization is geometric.
+- **Makes domains linearly separable** — a latent domain-probe jumps toward 1.0 with the token. The
+  token installs a clean per-domain geometry the frozen backbone reads off — the mechanism behind the
+  100%-best-is-self routing.
+
+## Repository
+
 ```
-
-## Quickstart (offline, ~10s on CPU)
-
-The `synth` recipe builds 4 near-orthogonal synthetic domains and a tiny local GPT-2 — no network,
-no model download. End-to-end for the headline method:
-
-```bash
-python scripts/build_data.py  --config configs/experiment/ours_unsup.yaml
-python scripts/train.py       --config configs/experiment/ours_unsup.yaml --device cpu
-python scripts/evaluate.py    --run experiments/ours_unsup_seed0
-python scripts/make_report.py --runs experiments --out reports/latest
-```
-
-Run every method (`dense`, `hard_moe`, `cbtm`, `mop`, `ours_fixed`, `ours_sup`, `ours_unsup`)
-the same way — only the `--config` changes — then `make_report.py` emits the comparison table
-(`reports/latest/main_table.md`, `results.csv`) and figures. Curated, committed run reports live
-in `reports/<run>/` (e.g. [`reports/m7-raven/`](reports/m7-raven/)); `reports/latest/` is the
-gitignored scratch dump for ad-hoc runs.
-
-## Layout
-
-```
-configs/        # all hyperparameters. data/ model/ train/ eval/ experiment/ (hydra-style `defaults:`)
+papers/master_thesis_stream_a.pdf   the EM technique (source)
+configs/experiment/                 dense_d256, moe_d256, em_{prefix,gov}_{seqA,}_d256 (+ synth test configs)
 src/softmoe/
-  data/         # download/synthetic → embed → cluster (kmeans/cobweb) → tokenize+shard → splits
-  models/       # ExpertTokenBank (the contribution) + SoftMoE wrapper + Router; baselines/
-  training/     # EM trainer, losses (LM + separation + load-balance + router), callbacks
-  eval/         # perplexity (per-domain, oracle vs routed), specialization metrics, harness, report
-  cli/          # build_data / train / evaluate / make_report  (mirrored by scripts/)
-scripts/        # thin CLI entrypoints
-tests/          # pytest: data, losses, model (grad flow), metric math, hermetic end-to-end smoke
-experiments/    # run outputs (gitignored): checkpoints, metrics.json, resolved_config.yaml
-reports/        # curated run reports (tracked, e.g. reports/m7-raven/); reports/latest/ is scratch
-data/           # gitignored corpora
+  models/    soft_moe (EM: prefix + governance) · expert_tokens · governance · baselines/{dense,hard_moe}
+  training/  em_trainer (two-phase Phase A/B) · losses
+  eval/      harness · specialization (swap/NMI) · mech_interp · cross_routing · moe_analysis
+scripts/     train · build_data · make_report · cross_routing · mech_interp · evaluate
+reports/comparison/                 the EM-vs-MoE-vs-full-FT report + specialization + mech-interp
+mpcdf-hpc-skills/                    Claude Code skills for running these on the MPCDF clusters
 ```
 
-## Key ideas in code
-
-- **`models/expert_tokens.py`** — `ExpertTokenBank`: learnable soft prompts; `trainable=False,
-  init='orthogonal'` *is* the fixed-orthogonal ablation baseline.
-- **`models/router.py`** — the E-step: `SupervisedRouter` (label-routed) or `SoftRouter` (amortized,
-  EM-hard / EM-soft top-k).
-- **`training/em_trainer.py`** — online soft-EM by default; optional periodic likelihood-based hard
-  reassignment (the c-BTM-flavored discovery loop) amortized into the router.
-- **`eval/specialization.py`** — routing NMI/accuracy, utilization entropy, token separation,
-  expert×domain contingency, and the **swap test** (route through the wrong expert).
-
-Every method exposes the same `forward(batch) -> {loss, logits, per_example_nll, aux}`, so
-`train.py` / `evaluate.py` are method-agnostic and a run is fully described by one
-`configs/experiment/*.yaml`.
-
-## Core experiment — [`reports/cmm/`](reports/cmm/)
-
-The repo's **core experiment** is the compute-matched MoE-validation test: a from-scratch,
-byte-level, multi-domain LM comparison (Jacobs 1991 / DEMix / c-BTM lineage) at **matched active
-compute**, which (a) reproduces the known MoE advantage (an oracle-routed MoE reaches a 5×-wider
-dense model's quality at the small model's per-token cost) and (b) tests whether our EM-discovered
-expert tokens share it. It compares the baselines (Dense-1×, Dense-5×, Hard-MoE learned + oracle)
-against our method under its three **training regimes**:
-
-- **frozen** — backbone fixed, only tokens + router learn (param-light; `configs/train/em_soft.yaml`);
-- **alternating** — repeated backbone⇄token blocks (the thesis's Phase A⇄B; `em_alternate.yaml`);
-- **sequential** — train the LLM on all data first, *then* freeze it and EM the tokens — a
-  finetuning-analog (`token_em.yaml` + `--init-backbone-from`; `cmm_ours_seq.yaml`).
-
-Expert tokens default to **one vector per expert** (`tokens_per_expert: 1`), matching the persona-
-token regime in [`papers/master_thesis_stream_a.pdf`](papers/master_thesis_stream_a.pdf). The
-pretrained-backbone pilot lives in [`reports/m7-raven/`](reports/m7-raven/) as a secondary result.
-
-## Scaling up (the headline run, M7)
-
-`configs/data/{dev,main}.yaml` and `configs/model/backbone_{gpt2,pythia160m}.yaml` swap in real
-HF corpora and pretrained backbones. The headline run trains on real multi-domain data with a
-pretrained backbone over ≥3 seeds — that is GPU/cluster work. Drive it on the **MPCDF clusters**
-via the Claude Code HPC skills wired into this repo (see [`CLAUDE.md`](CLAUDE.md) and
-`mpcdf-hpc-skills/`): e.g. `/toolbox:setup-repo`, `/data:get-dataset`, `/training:submit`,
-`/slurm:monitor`. `/ptmp` is purged — persist keeper checkpoints to archive/object storage.
-
-## Tests
-
+## Reproduce
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 32 hermetic tests, ~8s, no network
+DATA=/ptmp/$USER/soft-moe/data
+python scripts/build_data.py --config configs/experiment/dense_d256.yaml --data-root $DATA
+# full-FT and the standard MoE
+for m in dense_d256 moe_d256; do python scripts/train.py --config configs/experiment/$m.yaml --data-root $DATA --run-dir .../$m --device cuda; done
+# EM two-phase (prefix | governance): Phase A trains backbone (tokens frozen), Phase B fits only the tokens
+for v in prefix gov; do
+  python scripts/train.py --config configs/experiment/em_${v}_seqA_d256.yaml --data-root $DATA --run-dir .../em_${v}_seqA_d256 --device cuda
+  python scripts/train.py --config configs/experiment/em_${v}_d256.yaml --data-root $DATA --run-dir .../em_${v}_d256 \
+    --device cuda --init-backbone-from .../em_${v}_seqA_d256
+done
+python scripts/make_report.py   --runs <dir symlinking the 4 runs> --out reports/comparison
+python scripts/cross_routing.py --runs .../moe_d256 .../em_prefix_d256 .../em_gov_d256 --out reports/comparison/routing_analysis.md
+python scripts/mech_interp.py   --run .../em_gov_d256 --out reports/comparison/mech_interp
 ```
+
+*Running on the MPCDF clusters (Raven/Viper) is wired through `mpcdf-hpc-skills/` — see its README.*

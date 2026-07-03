@@ -1,10 +1,12 @@
 # soft-moe — research repo + MPCDF HPC automation
 
-This repository explores **soft-MoE-style partitioning within a single LLM**: how to
-condition subspaces of the weight matrix on the input so one model learns multiple
-"experts" (supervised and unsupervised variants). See `BRAINSTORM.md`, `README.md`,
-and the `plan/` folder (`01-data-collection`, `02-training`, `03-evaluation`,
-`THEORY.md`) for the research design.
+This repository contrasts the **EM expert-token finetuning** technique from
+`papers/master_thesis_stream_a.pdf` — conditioning a *single* shared backbone on a bank of
+EM-trained *expert tokens* (a two-phase Phase-A/Phase-B protocol) — against the **standard
+MoE** (real per-expert capacity) and **general finetuning** (a dense model), in a
+capacity-constrained multi-domain setting where the MoE's capacity is necessary. See
+`README.md` for the experiment, findings, and repository map. The headline comparison lives
+in `configs/experiment/*_d256.yaml` and `reports/comparison/`.
 
 Executing that plan — collecting data, training, and running inference — happens on
 the **MPCDF clusters** (Raven, Dais, Viper-GPU, Viper-CPU). The reusable Claude Code
