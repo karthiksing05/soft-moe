@@ -60,6 +60,11 @@ class SoftMoE(nn.Module):
         self.load_balance_kind = cfg.get("load_balance_kind", "entropy")
         self.soft_mixture = bool(cfg.get("soft_mixture", False))
         self.router_supervise_with = cfg.get("router_supervise_with")  # None|'cluster'|'domain'
+        # 'speaker' injection: the expert vector is a real inline discrete token `[DOMAIN_k]` at the
+        # front of the sequence (the thesis `[SPEAKER_X] <text>` format), output-tied to the bank so
+        # the model is trained to *emit* it — a genuine trained vocabulary token, not a soft prefix.
+        self.speaker_predict = bool(cfg.get("speaker_predict", True))
+        self._pad_id = int(cfg.get("pad_token_id", 0))
         self.d_model = backbone_hidden_size(backbone)
 
         if self.injection == "prefix_kv":
@@ -114,6 +119,36 @@ class SoftMoE(nn.Module):
         per_ex = causal_lm_loss(logits, labels, reduction="per_example")
         return per_ex, logits
 
+    def _forward_with_speaker(self, input_ids, attention_mask, labels, expert_ids):
+        """Speaker mode: an inline discrete `[DOMAIN_k]` token at the front (thesis persona format).
+
+        The per-domain vector is the bank embedding, prepended as a real token position; with
+        ``speaker_predict`` it is also output-tied (extended logits) and trained to be *emitted* —
+        so it is a genuine trained vocabulary token, not just a soft prefix."""
+        B = input_ids.shape[0]
+        emb = self.backbone.get_input_embeddings()
+        marker = self.tokens(expert_ids)                         # [B, T, d]  (T=1 per-domain vector)
+        Tm = marker.shape[1]
+        inp = emb(input_ids)
+        ones = lambda n: torch.ones(B, n, device=input_ids.device, dtype=attention_mask.dtype)
+        ign = lambda n: torch.full((B, n), -100, device=input_ids.device, dtype=labels.dtype)
+        if not self.speaker_predict:
+            combined = torch.cat([marker, inp], dim=1)
+            mask = torch.cat([ones(Tm), attention_mask], dim=1)
+            comb_labels = torch.cat([ign(Tm), labels], dim=1)
+            out = self.backbone(inputs_embeds=combined, attention_mask=mask)
+            return causal_lm_loss(out.logits, comb_labels, reduction="per_example"), out.logits[:, Tm:, :]
+        bos = emb(torch.full((B, 1), self._pad_id, device=input_ids.device, dtype=input_ids.dtype))
+        combined = torch.cat([bos, marker, inp], dim=1)
+        mask = torch.cat([ones(1 + Tm), attention_mask], dim=1)
+        out = self.backbone(inputs_embeds=combined, attention_mask=mask, output_hidden_states=True)
+        Vbase = out.logits.shape[-1]
+        marker_logits = out.hidden_states[-1] @ self.tokens.embeddings[:, 0, :].t()   # [B, seq, K] (tied)
+        full_logits = torch.cat([out.logits, marker_logits], dim=-1)
+        marker_lab = (Vbase + expert_ids).view(B, 1).to(labels.dtype)
+        comb_labels = torch.cat([ign(1), marker_lab, labels], dim=1)   # BOS ignored; marker scored
+        return causal_lm_loss(full_logits, comb_labels, reduction="per_example"), out.logits[:, 1 + Tm:, :]
+
     def _forward_with_governance(self, input_ids, attention_mask, labels, expert_ids):
         """Governance mode: the expert token modulates each block's FFN (no prefix prepended)."""
         e = self.tokens(expert_ids)[:, 0, :]                    # [B, d]  the per-expert latent
@@ -128,6 +163,10 @@ class SoftMoE(nn.Module):
     def _single_expert_forward(self, batch, expert_ids):
         if self.governs:
             return self._forward_with_governance(
+                batch["input_ids"], batch["attention_mask"], batch["labels"], expert_ids
+            )
+        if self.injection == "speaker":
+            return self._forward_with_speaker(
                 batch["input_ids"], batch["attention_mask"], batch["labels"], expert_ids
             )
         prefix = self.tokens(expert_ids)                        # [B, T, d]

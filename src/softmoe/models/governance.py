@@ -27,26 +27,48 @@ import torch
 import torch.nn as nn
 
 
+def _arch(backbone) -> str:
+    """Detect the transformer-block family so governance hooks attach to the right modules."""
+    if getattr(backbone, "transformer", None) is not None and hasattr(backbone.transformer, "h"):
+        return "gpt2"                                                  # GPT-2 / tiny byte-LM
+    inner = getattr(backbone, "model", None)
+    if inner is not None and hasattr(inner, "layers"):
+        return "llama"                                                 # Qwen2/Llama family (SwiGLU + GQA)
+    raise ValueError("Governance supports GPT-2 (transformer.h) and Qwen2/Llama (model.layers) backbones.")
+
+
 def _blocks(backbone):
-    tr = getattr(backbone, "transformer", None)
-    if tr is None or not hasattr(tr, "h"):
-        raise ValueError("Governance currently supports GPT-2-style backbones (transformer.h).")
-    return tr.h
+    return backbone.transformer.h if _arch(backbone) == "gpt2" else backbone.model.layers
 
 
-def ffn_act_modules(backbone) -> list[nn.Module]:
-    """Per-block FFN activation modules whose output is the ``d_ff`` hidden (GPT-2 family)."""
-    return [blk.mlp.act for blk in _blocks(backbone)]
+def ffn_sites(backbone):
+    """Per-block (module, hook_kind) whose signal is the ``d_ff`` FFN hidden.
+
+    GPT-2: the ``mlp.act`` *output* is the d_ff hidden (``forward`` hook). Qwen2/Llama compute the
+    SwiGLU hidden inline, so we gate the ``mlp.down_proj`` *input* (``pre`` hook)."""
+    if _arch(backbone) == "gpt2":
+        return [(blk.mlp.act, "forward") for blk in _blocks(backbone)]
+    return [(blk.mlp.down_proj, "pre") for blk in _blocks(backbone)]
 
 
-def attn_proj_modules(backbone) -> list[nn.Module]:
-    """Per-block attention output projections whose output is the ``d_model`` residual contribution."""
-    return [blk.attn.c_proj for blk in _blocks(backbone)]
+def attn_sites(backbone):
+    """Per-block (module, hook_kind) whose output is the ``d_model`` attention residual contribution."""
+    if _arch(backbone) == "gpt2":
+        return [(blk.attn.c_proj, "forward") for blk in _blocks(backbone)]
+    return [(blk.self_attn.o_proj, "forward") for blk in _blocks(backbone)]
 
 
 def ffn_hidden_size(backbone) -> int:
     cfg = backbone.config
-    return int(getattr(cfg, "n_inner", None) or 4 * cfg.n_embd)
+    for attr in ("intermediate_size", "n_inner"):          # Qwen/Llama · GPT-2
+        v = getattr(cfg, attr, None)
+        if v:
+            return int(v)
+    return int(4 * (getattr(cfg, "hidden_size", None) or cfg.n_embd))
+
+
+def n_blocks(backbone) -> int:
+    return len(_blocks(backbone))
 
 
 class FFNGovernor(nn.Module):
@@ -90,25 +112,32 @@ class FFNGovernor(nn.Module):
         return U
 
     def attach(self, backbone) -> None:
-        for l, act in enumerate(ffn_act_modules(backbone)):
-            act.register_forward_hook(self._make_hook("ffn", l, getattr(self, "U_ffn", None)))
+        for l, (mod, kind) in enumerate(ffn_sites(backbone)):
+            self._register(mod, kind, self._make_gate("ffn", l, getattr(self, "U_ffn", None)))
         if self.govern_attn:
-            for l, cp in enumerate(attn_proj_modules(backbone)):
-                cp.register_forward_hook(self._make_hook("attn", l, getattr(self, "U_attn", None)))
+            for l, (mod, kind) in enumerate(attn_sites(backbone)):
+                self._register(mod, kind, self._make_gate("attn", l, getattr(self, "U_attn", None)))
 
-    def _make_hook(self, site: str, l: int, U):
-        def hook(_module, _inp, out):
+    @staticmethod
+    def _register(module, kind: str, gate):
+        if kind == "pre":   # gate the module's INPUT (Qwen SwiGLU: down_proj input is the d_ff hidden)
+            module.register_forward_pre_hook(lambda m, args: (gate(args[0]),) + args[1:])
+        else:               # gate the module's OUTPUT (GPT-2 act output / attention o_proj)
+            module.register_forward_hook(lambda m, a, out: gate(out))
+
+    def _make_gate(self, site: str, l: int, U):
+        def gate(x):                                            # x: [B, L, dim]
             cur = self._cur.get(site)
             if cur is None:
-                return out
+                return x
             g = cur[l]                                          # [B, gate_out]
             if self.mode == "film":
-                return out * (2.0 * torch.sigmoid(g)).unsqueeze(1)         # init 1.0 => identity
-            Ul = U[l]                                           # [dim, r]
-            c = out @ Ul                                        # [B, L, r]  project onto subspace
+                return x * (2.0 * torch.sigmoid(g)).unsqueeze(1)          # init 1.0 => identity
+            Ul = U[l].to(x.dtype)                               # [dim, r]
+            c = x @ Ul                                          # [B, L, r]  project onto subspace
             s = (2.0 * torch.sigmoid(g) - 1.0).unsqueeze(1)     # [B, 1, r]  init 0 => identity
-            return out + (c * s) @ Ul.t()                       # rotate+scale r principal directions
-        return hook
+            return x + (c * s) @ Ul.t()                         # rotate+scale r principal directions
+        return gate
 
     def set_current(self, e: torch.Tensor) -> None:
         """``e``: [B, d_model] routed expert vectors -> stash per-site, per-layer gates."""

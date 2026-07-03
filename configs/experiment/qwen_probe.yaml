@@ -1,0 +1,14 @@
+# Architecture-port validation on a small Qwen (swap 'name' for Qwen2.5-32B in the real runs).
+defaults: [/data/demix8, /train/sc_phaseB, /eval/default]
+meta: { name: qwen_probe, regime: qwen_probe }
+model:
+  method: softmoe
+  backbone_mode: full
+  injection: spectral_ffn
+  governor_rank: 16
+  govern_attn: true
+  backbone: { kind: hf, name: Qwen/Qwen2.5-0.5B }
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: random, trainable: true }
+  router: { kind: supervised, route_by: domain }
+  router_supervise_with: domain
+seed: 0

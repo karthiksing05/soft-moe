@@ -78,13 +78,13 @@ def build_model(cfg, *, vocab_size: int, data_n_experts: int, centroids=None):
         }
         model = SoftMoE(backbone, tokens, router, wrapper_cfg)
         if model.governs:
-            from softmoe.models.governance import FFNGovernor, ffn_hidden_size
+            from softmoe.models.governance import FFNGovernor, ffn_hidden_size, n_blocks
 
             bmode = model_cfg.get("backbone_mode", "frozen")
             gov = FFNGovernor(
                 d_model=d_model,
                 d_ff=ffn_hidden_size(backbone),
-                n_layers=backbone.config.n_layer,
+                n_layers=n_blocks(backbone),
                 mode="film" if wrapper_cfg["injection"] == "film_ffn" else "spectral",
                 rank=int(model_cfg.get("governor_rank", 16)),
                 govern_attn=bool(model_cfg.get("govern_attn", False)),
