@@ -57,7 +57,7 @@ def analyze(runs: list[str]) -> dict:
             ablation[reg] = {"macro": r["macro"], "active": r["active"], "total": r["total"]}
 
     sizes = ["d128", "d256", "d384", "d512"]
-    models = ["dense", "moe_g1", "moe_g2", "ours"]
+    models = ["dense", "moe_g1", "moe_g2", "ours", "gov"]
     curve = {}
     for m in models:
         curve[m] = []
@@ -76,12 +76,14 @@ def analyze(runs: list[str]) -> dict:
         d = _mean(s, "dense")
         if d is None:
             continue
-        g2, ou = _mean(s, "moe_g2"), _mean(s, "ours")
+        g2, ou, gv = _mean(s, "moe_g2"), _mean(s, "ours"), _mean(s, "gov")
         row = {"size": s, "active": sweep_active.get((s, "dense")), "dense": d}
         if g2 is not None:
             row["moe_g2"] = g2; row["gap"] = d - g2
         if ou is not None:
             row["ours"] = ou; row["gap_ours"] = d - ou
+        if gv is not None:
+            row["gov"] = gv; row["gap_gov"] = d - gv
         gap.append(row)
     return {"curve": curve, "gap": gap, "ablation": ablation, "sizes": sizes}
 
@@ -89,8 +91,8 @@ def analyze(runs: list[str]) -> dict:
 def render_markdown(report: dict) -> str:
     L = ["# isoFLOP scaling sweep & ablations", ""]
     L += ["## Scaling curves (macro-ppl ↓, mean±std over seeds)", "",
-          "| size | active | dense | MoE-G1 (coarse) | MoE-G2 (fine) | ours (sup) | dense−G2 | dense−ours |",
-          "|---|---|---|---|---|---|---|---|"]
+          "| size | active | dense | MoE-G1 | MoE-G2 | ours (prefix) | gov (spectral) | dense−G2 | dense−gov |",
+          "|---|---|---|---|---|---|---|---|---|"]
     gap_by_size = {g["size"]: g for g in report["gap"]}
     for s in report["sizes"]:
         def cell(m):
@@ -103,11 +105,12 @@ def render_markdown(report: dict) -> str:
         g1cell, _ = cell("moe_g1")
         g2cell, _ = cell("moe_g2")
         oucell, _ = cell("ours")
+        gvcell, _ = cell("gov")
         g = gap_by_size.get(s, {})
         gp = f"{g['gap']:+.3f}" if g.get("gap") is not None else "—"
-        gpo = f"{g['gap_ours']:+.3f}" if g.get("gap_ours") is not None else "—"
+        gpv = f"{g['gap_gov']:+.3f}" if g.get("gap_gov") is not None else "—"
         act = f"{active/1e6:.1f}M" if active else "—"
-        L.append(f"| {s} | {act} | {dcell} | {g1cell} | {g2cell} | {oucell} | {gp} | {gpo} |")
+        L.append(f"| {s} | {act} | {dcell} | {g1cell} | {g2cell} | {oucell} | {gvcell} | {gp} | {gpv} |")
 
     L += ["", "## Gap-over-dense trend (does the advantage widen with scale? — H1/H2)", ""]
     for g in report["gap"]:
@@ -137,7 +140,8 @@ def make_plots(report: dict, out_dir: Path) -> None:
     # 1. scaling curves
     fig, ax = plt.subplots()
     for m, label, mk in [("dense", "Dense", "o"), ("moe_g1", "MoE-G1 coarse", "s"),
-                          ("moe_g2", "MoE-G2 fine", "^"), ("ours", "ours (sup)", "D")]:
+                          ("moe_g2", "MoE-G2 fine", "^"), ("ours", "ours prefix", "D"),
+                          ("gov", "ours gov (spectral)", "P")]:
         pts = [c for c in report["curve"].get(m, []) if c["active"]]
         if pts:
             xs = [p["active"] / 1e6 for p in pts]
@@ -153,12 +157,16 @@ def make_plots(report: dict, out_dir: Path) -> None:
         fig, ax = plt.subplots()
         g2 = [g for g in report["gap"] if g.get("gap") is not None]
         ou = [g for g in report["gap"] if g.get("gap_ours") is not None]
+        gv = [g for g in report["gap"] if g.get("gap_gov") is not None]
         if g2:
             ax.plot([g["active"] / 1e6 for g in g2], [g["gap"] for g in g2], "^-",
                     color="tab:red", label="MoE-G2 (fine)")
         if ou:
             ax.plot([g["active"] / 1e6 for g in ou], [g["gap_ours"] for g in ou], "D-",
-                    color="tab:blue", label="ours (sup)")
+                    color="tab:blue", label="ours prefix")
+        if gv:
+            ax.plot([g["active"] / 1e6 for g in gv], [g["gap_gov"] for g in gv], "P-",
+                    color="tab:purple", label="ours gov (spectral)")
         ax.axhline(0, color="gray", ls="--", lw=0.8)
         ax.set_xscale("log"); ax.set_xlabel("active params (M, log)")
         ax.set_ylabel("advantage over dense (ppl; >0 = better)")
