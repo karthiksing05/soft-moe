@@ -1,0 +1,15 @@
+# Governance capacity sweep: spectral FFN+attn at d512, rank=64 (Phase B).
+defaults: [/data/demix8, /train/sc_phaseB, /eval/default]
+meta: { name: govern_spectralA_r64_d512, regime: govern_spectralA_r64_d512 }
+model:
+  method: softmoe
+  backbone_mode: frozen
+  injection: spectral_ffn
+  governor_rank: 64
+  govern_attn: true
+  backbone: { kind: tiny, tiny: { n_embd: 512, n_layer: 8, n_head: 8, n_inner: 2048, n_positions: 576 } }
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: random, trainable: true }
+  router: { kind: supervised, route_by: domain }
+  router_supervise_with: domain
+train: { max_steps: 6000, eval_every: 2000 }
+seed: 0
