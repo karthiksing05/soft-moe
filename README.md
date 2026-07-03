@@ -34,29 +34,31 @@ tokens. EM-governance is the best-performing realization; EM-prefix is the liter
 Filled from [`reports/comparison/`](reports/comparison/) (macro-perplexity ↓, and **swap-ratio** =
 how much routing a domain through the *wrong* expert costs — a direct measure of specialization).
 
-| method | macro-ppl ↓ | swap-ratio ↑ | routing-NMI ↑ | total params |
-|---|---|---|---|---|
-| **MoE (standard)** | **2.69** | — | — | ~14M |
-| EM-governance | 2.90 | ~1.6 | 1.00 | ~5M |
-| EM-prefix | 2.95 | ~1.5 | 1.00 | ~5M |
-| dense (full FT) | 2.97 | — | — | ~5M |
+| method | macro-ppl ↓ | swap-ratio ↑ | routing-NMI ↑ | trained params | total params |
+|---|---|---|---|---|---|
+| **MoE (standard)** | **2.660** | — | — | 27M (full) | 27M |
+| EM-governance | 2.894 | **1.62** | **1.00** | **2,048** | 5.1M |
+| EM-prefix | 2.940 | 1.53 | **1.00** | **2,048** | 5.0M |
+| dense (full FT) | 2.965 | — | — | 5.0M (full) | 5.0M |
 
-*(numbers refreshed by the comparison job; see `reports/comparison/main_table.md`.)*
+Per-domain: the MoE is best on all 8 domains, EM-governance beats dense on all 8
+([`per_domain_ppl.md`](reports/comparison/per_domain_ppl.md)).
 
 **Three findings.**
 
-1. **The MoE is necessary — for capacity.** It is far ahead (2.69 vs 2.97 dense), a gap *no amount of
-   conditioning closes*, because the gap is capacity: the MoE adds real per-expert FFN parameters
-   (~3× total) and sparse routing. Neither the EM tokens nor full-FT can reach it on a fixed backbone.
-   (A prior rank/granularity study confirmed this is a hard ceiling: growing the EM governor's rank
-   8× moves perplexity by <0.01, while MoE granularity keeps improving.)
+1. **The MoE is necessary — for capacity.** It is far ahead (**2.660 vs 2.965** dense, −0.31), a gap
+   *no amount of conditioning closes*, because the gap is capacity: the MoE adds real per-expert FFN
+   parameters (**5.5× total**, 27M vs 5M) and sparse routing. Neither the EM tokens nor full-FT reach
+   it on a fixed backbone. (A prior rank/granularity study confirmed this is a hard ceiling: growing
+   the EM governor's rank 8× moves perplexity by <0.01, while MoE granularity keeps improving.)
 2. **The EM method beats full finetuning — for near-free, and with *specialization full-FT lacks*.**
-   Both EM variants edge out dense while training **only the expert tokens** on a frozen backbone,
-   and every domain routes to its own expert (**routing-NMI 1.0**, swap-ratio ~1.5–1.6: sending a
-   domain through the wrong token costs 50–60% perplexity). Full-FT and the MoE have *no* such
+   Both EM variants edge out dense (2.894 / 2.940 < 2.965) while training **only the 2,048 expert-token
+   parameters** on a frozen backbone, and every domain routes to its own expert (**routing-NMI 1.00**,
+   swap-ratio **1.5–1.6**: sending a domain through the wrong token costs 53–62% perplexity —
+   [`routing_analysis.md`](reports/comparison/routing_analysis.md)). Full-FT and the MoE have *no* such
    interpretable per-domain structure — the MoE's routing is balanced/emergent, not domain-aligned.
 3. **Governance > prefix.** Letting the token govern an FFN/attention *subspace* beats prepending it
-   as a prefix (2.90 vs 2.95), with stronger specialization.
+   as a prefix (**2.894 vs 2.940**), with stronger specialization (swap 1.62 vs 1.53).
 
 **The trade-off, in one line:** the **MoE buys capacity** (best quality, no interpretable
 specialization); the **EM method buys specialization** (clean per-domain experts, near-free, on a
@@ -70,9 +72,9 @@ frozen backbone) but not capacity; **full finetuning buys neither**.
   nudges early features, increasingly reshapes late, domain-specific ones).
 - **Each domain governs a distinct subspace** — cross-expert gate overlap goes negative deep in the
   net (domains use *anti-correlated* FFN directions); the specialization is geometric.
-- **Makes domains linearly separable** — a latent domain-probe jumps toward 1.0 with the token. The
-  token installs a clean per-domain geometry the frozen backbone reads off — the mechanism behind the
-  100%-best-is-self routing.
+- **Makes domains linearly separable** — a latent domain-probe jumps **0.875 → 1.000** with the token.
+  The token installs a clean per-domain geometry the frozen backbone reads off — the mechanism behind
+  the 100%-best-is-self routing.
 
 ## Repository
 
