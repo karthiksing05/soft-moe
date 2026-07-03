@@ -1,0 +1,13 @@
+# EM (thesis prefix) Phase A: train backbone with frozen expert tokens present.
+defaults: [/data/demix8, /train/sc_dense, /eval/default]
+meta: { name: em_prefix_seqA_d256, regime: emprefixseqA }
+model:
+  method: softmoe
+  backbone_mode: full
+  injection: prefix
+  backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 1024, n_positions: 576 } }
+  expert_tokens: { n_experts: auto, tokens_per_expert: 1, init: random, trainable: false }
+  router: { kind: supervised, route_by: domain }
+  router_supervise_with: domain
+train: { max_steps: 20000, eval_every: 5000 }
+seed: 0

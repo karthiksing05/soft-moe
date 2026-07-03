@@ -1,9 +1,0 @@
-# Baseline: Hard MoE (top-k token-routed FFN experts). Parameter-heavy upper bound.
-defaults: [/data/synth, /model/backbone_tiny, /train/supervised, /eval/default]
-meta: { name: hard_moe, regime: hard_moe }
-model:
-  method: hard_moe
-  hard_moe: { n_experts: 4, top_k: 1 }
-train:
-  lambdas: { sep: 0.0, balance: 0.01, route: 0.0 }
-seed: 0

@@ -1,8 +1,8 @@
 """Build any method from config behind one factory, so train/eval stay method-agnostic.
 
-``cfg.model.method`` selects: ``softmoe`` (ours / ours-fixed / MoP), ``dense``, ``hard_moe``,
-``cbtm``. n_experts/d_model/vocab are injected from the data + backbone so configs can say
-``n_experts: auto``.
+``cfg.model.method`` selects: ``softmoe`` (the EM expert-token method: prefix or FFN governance),
+``dense`` (general finetuning baseline), and ``hard_moe`` (the standard MoE). n_experts/d_model/vocab
+are injected from the data + backbone so configs can say ``n_experts: auto``.
 """
 
 from __future__ import annotations
@@ -49,15 +49,6 @@ def build_model(cfg, *, vocab_size: int, data_n_experts: int, centroids=None):
                        n_shared=int(moe_cfg.get("n_shared", 0)),
                        upcycle=bool(moe_cfg.get("upcycle", False)),
                        route_by=moe_cfg.get("route_by", "learned"))
-
-    if method == "cbtm":
-        from softmoe.models.baselines.cbtm import CBTM
-
-        n_clusters = _resolve_n_experts(model_cfg.get("n_clusters", "auto"), data_n_experts)
-        backbones = [
-            build_backbone({**backbone_cfg, "backbone_mode": "full"}, vocab_size) for _ in range(n_clusters)
-        ]
-        return CBTM(backbones, route_by=model_cfg.get("route_by", "cluster"))
 
     if method == "softmoe":
         backbone = build_backbone({**backbone_cfg, "backbone_mode": model_cfg.get("backbone_mode", "frozen")}, vocab_size)

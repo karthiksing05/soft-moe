@@ -1,3 +1,0 @@
-# EleutherAI/pythia-160m — alternate dev/headline backbone knob.
-model:
-  backbone: { kind: hf, name: EleutherAI/pythia-160m }

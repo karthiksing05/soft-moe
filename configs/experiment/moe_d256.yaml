@@ -1,0 +1,6 @@
+# Standard MoE (fine-grained, G=2): 16 experts width/2, top-2. The capacity baseline.
+defaults: [/data/demix8, /train/sc_moe, /eval/default]
+meta: { name: moe_d256, regime: moe }
+model: { method: hard_moe, backbone_mode: full, load_balance_kind: switch, backbone: { kind: tiny, tiny: { n_embd: 256, n_layer: 6, n_head: 8, n_inner: 1024, n_positions: 576 } }, hard_moe: { base_experts: 8, granularity: 2, top_k: 1, upcycle: false } }
+train: { max_steps: 20000, eval_every: 5000 }
+seed: 0

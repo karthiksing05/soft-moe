@@ -1,9 +1,0 @@
-# M7 core-subset: Dense baseline on dev corpus with pretrained pythia-160m (full fine-tune).
-defaults: [/data/dev, /model/backbone_pythia160m, /train/supervised, /eval/default]
-meta: { name: dense_dev, regime: dense }
-data: { tokenizer: EleutherAI/pythia-160m }
-model:
-  method: dense
-  backbone_mode: full
-train: { max_steps: 2000, batch_size: 8, grad_accum: 2, eval_every: 500, log_every: 100, keep_last: 1, optimizer: { name: adamw, lr: 5.0e-5, wd: 0.0 } }
-seed: 0

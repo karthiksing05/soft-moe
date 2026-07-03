@@ -60,14 +60,6 @@ class SoftMoE(nn.Module):
         self.load_balance_kind = cfg.get("load_balance_kind", "entropy")
         self.soft_mixture = bool(cfg.get("soft_mixture", False))
         self.router_supervise_with = cfg.get("router_supervise_with")  # None|'cluster'|'domain'
-        self.mop_average = bool(cfg.get("mop_average", False))         # MoP: average prompts by router probs
-        # 'token' injection: deliver the expert vector as an inline DISCRETE marker `[EXPERT_k]` at
-        # the front of the sequence (thesis `[SPEAKER_X] <text>` / conversational role-token style).
-        # token_predict_marker=True also trains the model to *emit* the marker (part of the
-        # ground-truth response, output-tied to the bank); False = conditioning-only (which, for a
-        # front vector, is mechanically identical to `prefix`).
-        self.token_predict_marker = bool(cfg.get("token_predict_marker", True))
-        self._pad_id = int(cfg.get("pad_token_id", 0))
         self.d_model = backbone_hidden_size(backbone)
 
         if self.injection == "prefix_kv":
@@ -122,41 +114,6 @@ class SoftMoE(nn.Module):
         per_ex = causal_lm_loss(logits, labels, reduction="per_example")
         return per_ex, logits
 
-    def _forward_with_token(self, input_ids, attention_mask, labels, expert_ids):
-        """Token mode: the expert vector is an inline DISCRETE marker at the front of the sequence.
-
-        Conditioning-only (``token_predict_marker=False``) prepends the bank vector at position 0 —
-        mechanically identical to ``prefix``. With ``token_predict_marker=True`` we also prepend a
-        BOS slot and train the model to *emit* the marker (output-tied to the bank via extended
-        logits), so the marker is part of the ground-truth sequence — the conversational-FT style."""
-        B = input_ids.shape[0]
-        emb = self.backbone.get_input_embeddings()
-        marker = self.tokens(expert_ids)                         # [B, T, d]  (T=1 expert vector)
-        Tm = marker.shape[1]
-        inp = emb(input_ids)                                     # [B, L, d]
-        ones = lambda n: torch.ones(B, n, device=input_ids.device, dtype=attention_mask.dtype)
-        ign = lambda n: torch.full((B, n), -100, device=input_ids.device, dtype=labels.dtype)
-        if not self.token_predict_marker:
-            combined = torch.cat([marker, inp], dim=1)
-            mask = torch.cat([ones(Tm), attention_mask], dim=1)
-            comb_labels = torch.cat([ign(Tm), labels], dim=1)
-            out = self.backbone(inputs_embeds=combined, attention_mask=mask)
-            per_ex = causal_lm_loss(out.logits, comb_labels, reduction="per_example")
-            return per_ex, out.logits[:, Tm:, :]
-        # predict-marker: [BOS, marker, text]; marker is a scored, output-tied vocab member.
-        bos = emb(torch.full((B, 1), self._pad_id, device=input_ids.device, dtype=input_ids.dtype))
-        combined = torch.cat([bos, marker, inp], dim=1)
-        mask = torch.cat([ones(1 + Tm), attention_mask], dim=1)
-        out = self.backbone(inputs_embeds=combined, attention_mask=mask, output_hidden_states=True)
-        Vbase = out.logits.shape[-1]
-        marker_vecs = self.tokens.embeddings[:, 0, :]            # [K, d] output prototypes (tied)
-        marker_logits = out.hidden_states[-1] @ marker_vecs.t()  # [B, seq, K]
-        full_logits = torch.cat([out.logits, marker_logits], dim=-1)   # [B, seq, V+K]
-        marker_lab = (Vbase + expert_ids).view(B, 1).to(labels.dtype)  # marker id in extended space
-        comb_labels = torch.cat([ign(1), marker_lab, labels], dim=1)   # BOS ignored; marker scored
-        per_ex = causal_lm_loss(full_logits, comb_labels, reduction="per_example")
-        return per_ex, out.logits[:, 1 + Tm:, :]
-
     def _forward_with_governance(self, input_ids, attention_mask, labels, expert_ids):
         """Governance mode: the expert token modulates each block's FFN (no prefix prepended)."""
         e = self.tokens(expert_ids)[:, 0, :]                    # [B, d]  the per-expert latent
@@ -173,10 +130,6 @@ class SoftMoE(nn.Module):
             return self._forward_with_governance(
                 batch["input_ids"], batch["attention_mask"], batch["labels"], expert_ids
             )
-        if self.injection == "token":
-            return self._forward_with_token(
-                batch["input_ids"], batch["attention_mask"], batch["labels"], expert_ids
-            )
         prefix = self.tokens(expert_ids)                        # [B, T, d]
         if self.injection == "prefix_kv":
             return self._forward_with_prefix_kv(
@@ -190,19 +143,7 @@ class SoftMoE(nn.Module):
     def forward(self, batch, em_hard: bool = False) -> dict:
         route = self.route(batch, hard=em_hard)
 
-        if self.mop_average:
-            # MoP: prefix = responsibility-weighted average of ALL expert tokens (joint, no EM).
-            w = route.responsibilities                          # [B, K]
-            prefix = torch.einsum("bk,ktd->btd", w, self.tokens.embeddings)
-            if self.injection == "prefix_kv":
-                per_ex, logits = self._forward_with_prefix_kv(
-                    batch["input_ids"], batch["attention_mask"], batch["labels"], prefix
-                )
-            else:
-                per_ex, logits = self._forward_with_prefix(
-                    batch["input_ids"], batch["attention_mask"], batch["labels"], prefix
-                )
-        elif self.soft_mixture and route.topk_ids is not None and route.topk_ids.shape[1] > 1:
+        if self.soft_mixture and route.topk_ids is not None and route.topk_ids.shape[1] > 1:
             # Soft-EM mixture over top-k experts: weight per-example NLL by responsibilities.
             k = route.topk_ids.shape[1]
             nll_stack = []

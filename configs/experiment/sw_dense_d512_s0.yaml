@@ -1,5 +1,0 @@
-defaults: [/data/demix8, /train/sc_dense, /eval/default]
-meta: { name: sw_dense_d512_s0, regime: dense_d512 }
-model: { method: dense, backbone_mode: full, backbone: { kind: tiny, tiny: { n_embd: 512, n_layer: 8, n_head: 8, n_inner: 2048, n_positions: 576 } } }
-train: { max_steps: 20000, eval_every: 5000 }
-seed: 0
