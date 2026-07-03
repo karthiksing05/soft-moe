@@ -12,12 +12,25 @@ sequential** — Phase A trains the backbone (20k) with the tokens present-but-f
 Phase B (6k) freezes the backbone and tunes only the 8 tokens; supervised routing, T=1. Compute ≈
 dense (Phase B is token-only). Figures: `comparison_figures/9_scaling_curves.png`, `10_gap_vs_scale.png`.
 
-| size | active | dense | MoE-G1 (coarse) | MoE-G2 (fine) | ours | **dense−G2** | **dense−ours** |
-|---|---|---|---|---|---|---|---|
-| d128 | 0.9M | 3.876 | 3.951 | 3.437 | 3.751 | **+0.440** | **+0.125** |
-| d256 | 5.0M | 2.971±.004 | 3.017±.012 | 2.692±.030 | 2.949 | **+0.278** | **+0.022** |
-| d384 | 11.0M | 2.681 | 2.832 | 2.520 | 2.641 | **+0.161** | **+0.040** |
-| d512 | 25.6M | 2.535 | 2.704 | 2.465 | 2.527 | **+0.071** | **+0.008** |
+Now with the **governance** arm (spectral FFN+attn, rank16) run at all four sizes on the same 20k
+Phase A + 6k Phase B recipe — so `ours` (prefix) and `gov` (spectral subspace governance) are
+directly comparable across scale.
+
+| size | active | dense | MoE-G1 | MoE-G2 | ours prefix | gov spectral | **dense−G2** | **dense−gov** |
+|---|---|---|---|---|---|---|---|---|
+| d128 | 0.9M | 3.876 | 3.951 | 3.437 | 3.751 | 3.803 | **+0.440** | +0.073 |
+| d256 | 5.0M | 2.971±.004 | 3.017±.012 | 2.692±.030 | 2.949 | 2.903 | **+0.278** | +0.068 |
+| d384 | 11.0M | 2.681 | 2.832 | 2.520 | 2.641 | 2.648 | **+0.161** | +0.033 |
+| d512 | 25.6M | 2.535 | 2.704 | 2.465 | 2.527 | 2.520 | **+0.071** | +0.015 |
+
+**Governance scales like prefix — both beat dense everywhere, both saturate, both far below the MoE.**
+`gov` beats dense at all four sizes (dense−gov +0.073→+0.015) and tracks the prefix curve closely
+(gov is marginally ahead at d256/d512, prefix at d128/d384). Two conditioning mechanisms, essentially
+the same isoFLOP trajectory: a positive-but-shrinking edge that never approaches MoE-G2's. (Governance
+*does* pull ahead of prefix with a longer Phase A — the d512 *headline* run at 30k Phase A gives
+gov+attn 2.446 vs prefix 2.460; the governor needs more backbone training to pay off, which the
+matched-20k sweep understates.) The throughline holds at every scale: **conditioning a fixed backbone
+saturates below the MoE; the gap is capacity.**
 
 **H2 — granularity does real work (confirmed at *every* scale):** MoE-G2 beats dense at all four
 sizes; coarse MoE-G1 is *worse* than dense at all four. The coarse Switch/Mixtral config never
