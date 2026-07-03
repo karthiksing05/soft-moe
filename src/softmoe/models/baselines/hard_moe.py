@@ -85,15 +85,26 @@ class MoEFFN(nn.Module):
             topw, topi = probs.topk(self.top_k, dim=-1)        # [N, k]
             topw = topw / topw.sum(dim=-1, keepdim=True).clamp(min=1e-9)
 
-        out = torch.zeros_like(x)
-        n_active = topi.shape[1]
-        for j in range(n_active):
-            idx = topi[:, j]
-            w = topw[:, j].unsqueeze(-1)
-            for k in range(self.n_experts):
-                sel = idx == k
-                if sel.any():
-                    out[sel] += w[sel] * self.experts[k](x[sel])
+        # Batched dispatch: flatten the (token, top-k slot) routed instances, sort by expert, and run
+        # ONE contiguous matmul per expert (vs the old top_k × n_experts masked forwards). Same math,
+        # but O(n_experts) clean GEMMs instead of O(top_k·n_experts) masked index-ops — makes G4/G8
+        # feasible. Numerically equivalent to the naive loop (verified to <1e-5).
+        N, k = x.shape[0], topi.shape[1]
+        tok = torch.arange(N, device=x.device).unsqueeze(1).expand(N, k).reshape(-1)   # [N*k] token id
+        exp = topi.reshape(-1)                                                          # [N*k] expert id
+        wt = topw.reshape(-1).unsqueeze(-1)                                             # [N*k, 1] weight
+        order = torch.argsort(exp)
+        tok_s, wt_s = tok[order], wt[order]
+        xin = x[tok_s]                                                                  # sorted by expert
+        counts = torch.bincount(exp, minlength=self.n_experts).tolist()
+        chunks, off = [], 0
+        for e in range(self.n_experts):
+            c = counts[e]
+            if c:
+                chunks.append(self.experts[e](xin[off:off + c]))
+                off += c
+        yout = torch.cat(chunks, 0) if chunks else xin
+        out = x.new_zeros(N, d).index_add_(0, tok_s, yout * wt_s)
         for s in self.shared:                                  # always-on experts
             out = out + s(x)
 
