@@ -33,6 +33,7 @@ def main() -> int:
     ap.add_argument("--max-len", type=int, default=1024)
     ap.add_argument("--init-from", default=None, help="warm-start dir (EM Phase B loads Phase A)")
     ap.add_argument("--dry-run", action="store_true", help="load + one forward/backward, no train/save (compat check)")
+    ap.add_argument("--lora", action="store_true", help="parameter-efficient FT (for the 14B MoE on 1-2 GPUs)")
     a = ap.parse_args()
     from transformers import AutoModelForCausalLM, AutoTokenizer
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -50,6 +51,11 @@ def main() -> int:
         model.resize_token_embeddings(len(tok))
     if a.phase == "full" and not a.dry_run:                # fit full-FT in memory
         model.gradient_checkpointing_enable(); model.config.use_cache = False
+    if a.lora:                                             # parameter-efficient FT (the 14B MoE on 1-2 GPUs)
+        from peft import LoraConfig, get_peft_model
+        model = get_peft_model(model, LoraConfig(
+            r=16, lora_alpha=32, lora_dropout=0.05, task_type="CAUSAL_LM",
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]))
     V = model.get_input_embeddings().weight.shape[0]
     n_ex = experts["n_experts"]
 
