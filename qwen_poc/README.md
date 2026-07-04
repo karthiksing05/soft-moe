@@ -1,14 +1,29 @@
-# Qwen chat-SFT proof-of-concept: generic assistant token vs learned per-expert tokens (EM)
+# Qwen chat-SFT proof-of-concept: generic assistant token vs learned per-expert tokens (EM) vs MoE
 
 A deliberately simple test of the master-thesis idea on a real LLM. In chat SFT the **assistant-role
 marker is exactly where a persona/expert token belongs**: standard SFT uses one generic `assistant`
-marker for every example; the thesis proposes making it **per-expert** and learning it via EM. Two
-Qwen-32B models, identical data and compute, differing only in that marker.
+marker for every example; the thesis proposes making it **per-expert** and learning it via EM.
 
-| model | assistant marker | training |
-|---|---|---|
-| **control** | generic `<\|im_start\|>assistant` | straight full-FT SFT |
-| **EM** | per-expert `<\|im_start\|><\|expert_k\|>` | two-phase EM (Phase A full-FT with expert tokens present; Phase B freezes the model and fits **only** the K expert-token embeddings) |
+**Model scale (deliberate).** We do *not* use Qwen-32B: it already answers gsm8k/sciq/trivia/alpaca
+near-ceiling, so SFT would show no signal for control *or* EM. We use a size that is **coherent but
+genuinely improved by finetuning**, with a **matched-active-compute MoE** so the capacity comparison
+is fair:
+
+| role | model | active | total |
+|---|---|---|---|
+| dense (control + EM) | **Qwen2.5-3B** | ~3B | 3B |
+| MoE (SFT) | **Qwen1.5-MoE-A2.7B** | ~2.7B | **14.3B** |
+
+Three models, identical data:
+
+| model | assistant marker | training | buys |
+|---|---|---|---|
+| **control** (dense) | generic `<\|im_start\|>assistant` | full-FT SFT | baseline |
+| **EM** (dense) | per-expert `<\|im_start\|><\|expert_k\|>` | two-phase EM (Phase A full-FT w/ expert tokens; Phase B freezes the model, fits **only** the K expert-token embeddings) | cheap per-domain specialization |
+| **MoE** | generic `<\|im_start\|>assistant` | full-FT SFT of `Qwen1.5-MoE-A2.7B` | genuine capacity (14.3B total, ~matched active) |
+
+The payoff question: at matched per-token compute, does the EM token trick on a 3B dense approach the
+MoE's capacity — and does it add per-domain specialization neither the control nor the MoE has?
 
 ## Data (`scripts/build_chat_data.py`)
 
@@ -36,26 +51,28 @@ models" — e.g. distillation sets from different source LLMs — is a drop-in: 
 ## Training (`qwen_poc/train_sft.py`)
 
 ```
-# control: straight SFT
-train_sft.py --model Qwen/Qwen2.5-32B --data data --variant control --phase full  --out runs/control
-# EM Phase A: full-FT with the per-expert tokens present (frozen embeddings warm up the backbone)
-train_sft.py --model Qwen/Qwen2.5-32B --data data --variant em      --phase full  --out runs/em_A
-# EM Phase B: freeze the whole model, fit ONLY the K expert-token embeddings
-train_sft.py --model Qwen/Qwen2.5-32B --data data --variant em --phase tokens --init-from runs/em_A --out runs/em_B
+# 1. control (dense): straight SFT
+train_sft.py --model Qwen/Qwen2.5-3B --data data --variant control --phase full --out runs/control
+# 2. EM (dense) Phase A: full-FT with the per-expert tokens present (frozen), then
+train_sft.py --model Qwen/Qwen2.5-3B --data data --variant em --phase full --out runs/em_A
+#    EM Phase B: freeze the whole model, fit ONLY the K expert-token embeddings
+train_sft.py --model Qwen/Qwen2.5-3B --data data --variant em --phase tokens --init-from runs/em_A --out runs/em_B
+# 3. MoE: straight SFT of the matched-active MoE (same trainer, just a bigger model)
+train_sft.py --model Qwen/Qwen1.5-MoE-A2.7B --data data --variant control --phase full --out runs/moe
 ```
 
 `--phase tokens` freezes all parameters and gradient-masks the input embedding to update **only the K
-`<|expert_k|>` rows** — the literal "train the expert tokens" step. The script is single-process for
-validation; **at 32B it is launched under FSDP** (see below).
+`<|expert_k|>` rows** — the literal "train the expert tokens" step (`wd=0` there, else decay would
+shrink the frozen vocab rows).
 
 ## Scale & compute
 
-- **Validated end-to-end on Qwen2.5-0.5B** (all three runs: control / EM Phase A / EM Phase B) — the
-  pipeline (data → tokenize → completion-only loss → two-phase EM → expert-token grads) is proven.
-- **Target: Qwen2.5-32B on Dais** (8× H200 ≈ 1.1 TB/node → 32B full-FT FSDP fits on a **single node**;
-  see the cluster review). `control`-full and `em`-Phase-A are the heavy runs (full-FT under
-  FSDP/`accelerate`); `em`-Phase-B is cheap (only the expert rows train). 24 h walltime cap → the
-  full-FT runs need graceful-drain checkpoint+resume.
+- **Validated end-to-end on Qwen2.5-0.5B** (control / EM Phase A / EM Phase B all run; Phase B trains
+  only the expert rows) — the pipeline is proven.
+- **Tractable on Raven** at this scale (no 32B multi-node needed): Qwen2.5-3B full-FT fits on ~1×A100-80G
+  or 2×A100-40G (ZeRO/gradient-checkpointing); Qwen1.5-MoE-A2.7B (14.3B) full-FT fits on a **single
+  4×A100 node** (FSDP). EM Phase B (dense) is cheap — a frozen forward + K-row update. Dais (8×H200)
+  is a comfortable alternative but not required now.
 
 ## Evaluation & analysis
 

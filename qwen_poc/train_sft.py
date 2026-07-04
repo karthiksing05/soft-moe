@@ -32,6 +32,7 @@ def main() -> int:
     ap.add_argument("--lr", type=float, default=None)
     ap.add_argument("--max-len", type=int, default=1024)
     ap.add_argument("--init-from", default=None, help="warm-start dir (EM Phase B loads Phase A)")
+    ap.add_argument("--dry-run", action="store_true", help="load + one forward/backward, no train/save (compat check)")
     a = ap.parse_args()
     from transformers import AutoModelForCausalLM, AutoTokenizer
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -40,10 +41,15 @@ def main() -> int:
     tok = AutoTokenizer.from_pretrained(a.model)
     experts = json.loads((Path(a.data) / "experts.json").read_text())
     src = a.init_from or a.model
-    model = AutoModelForCausalLM.from_pretrained(src, torch_dtype=dtype).to(dev)
+    dmap = "auto" if a.dry_run else None                   # dry-run only needs a forward → shard freely
+    model = AutoModelForCausalLM.from_pretrained(src, torch_dtype=dtype, device_map=dmap)
+    if dmap is None:
+        model = model.to(dev)
     if a.variant == "em":                                  # add the per-expert special tokens
         tok.add_special_tokens({"additional_special_tokens": experts["expert_tokens"]})
         model.resize_token_embeddings(len(tok))
+    if a.phase == "full" and not a.dry_run:                # fit full-FT in memory
+        model.gradient_checkpointing_enable(); model.config.use_cache = False
     V = model.get_input_embeddings().weight.shape[0]
     n_ex = experts["n_experts"]
 
@@ -82,6 +88,14 @@ def main() -> int:
         A = (X != pad).long()
         return X, Y, A
     loader = DataLoader(rows, batch_size=a.bs, shuffle=True, collate_fn=collate)
+
+    if a.dry_run:                                          # compat check: one forward/backward only
+        X, Y, A = next(iter(loader))
+        out = model(input_ids=X, attention_mask=A, labels=Y)
+        out.loss.backward()
+        print(f"DRY-RUN OK  model={a.model}  variant={a.variant}  loss={out.loss.item():.4f}  "
+              f"n_params={sum(p.numel() for p in model.parameters()):,}")
+        return 0
 
     model.train()
     it = iter(loader); step = 0; expert_row_grad = 0.0
