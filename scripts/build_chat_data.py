@@ -18,8 +18,8 @@ def _first(x): return x[0] if isinstance(x, (list, tuple)) and x else x
 REGISTRY = [
     ("math",     "gsm8k",       "main",          "train", lambda e: (e["question"], e["answer"])),
     ("science",  "sciq",         None,           "train", lambda e: (e["question"], e["correct_answer"])),
-    ("medical",  "bigbio/pubmed_qa", "pubmed_qa_labeled_fold0_source", "train",
-                 lambda e: (e["QUESTION"], e["LONG_ANSWER"])),
+    ("medical",  "qiaojin/PubMedQA", "pqa_labeled", "train",
+                 lambda e: (e["question"], e["long_answer"])),
     ("trivia",   "mandarjoshi/trivia_qa", "rc.nocontext", "train",
                  lambda e: (e["question"], _first(e["answer"]["aliases"]) or e["answer"]["value"])),
     ("general",  "tatsu-lab/alpaca", None,        "train",
@@ -42,7 +42,7 @@ def main() -> int:
     rows = {"control": {"train": [], "test": []}, "em": {"train": [], "test": []}}
     for k, (name, hf_id, cfg, split, extract) in enumerate(REGISTRY):
         try:
-            ds = load_dataset(hf_id, cfg, split=split) if cfg else load_dataset(hf_id, split=split)
+            ds = load_dataset(hf_id, cfg, split=split, trust_remote_code=True) if cfg else load_dataset(hf_id, split=split, trust_remote_code=True)
         except Exception as ex:
             print(f"[skip] {name} ({hf_id}): {ex}"); continue
         n = 0
