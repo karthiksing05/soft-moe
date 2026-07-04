@@ -65,8 +65,8 @@ def main() -> int:
             p.requires_grad_(False)
         emb = model.get_input_embeddings().weight
         emb.requires_grad_(True)
-        mask = torch.zeros(emb.shape[0], 1, device=dev); mask[V - n_ex:] = 1.0
-        emb.register_hook(lambda g: g * mask)              # zero grads for all but the expert rows
+        mask = torch.zeros(emb.shape[0], 1, device=dev, dtype=emb.dtype); mask[V - n_ex:] = 1.0
+        emb.register_hook(lambda g: g * mask)              # zero grads for all but the expert rows (dtype-safe)
     trainable = [p for p in model.parameters() if p.requires_grad]
     lr = a.lr or (1e-2 if a.phase == "tokens" else 1e-5)
     # wd=0 in the tokens phase is REQUIRED: AdamW decay would still shrink the frozen (grad-masked)
