@@ -57,7 +57,11 @@ def main() -> int:
         emb.register_hook(lambda g: g * mask)              # zero grads for all but the expert rows
     trainable = [p for p in model.parameters() if p.requires_grad]
     lr = a.lr or (1e-2 if a.phase == "tokens" else 1e-5)
-    opt = torch.optim.AdamW(trainable, lr=lr)
+    # wd=0 in the tokens phase is REQUIRED: AdamW decay would still shrink the frozen (grad-masked)
+    # vocab rows. eff = the *effective* trainable count (only the K expert rows actually update).
+    opt = torch.optim.AdamW(trainable, lr=lr, weight_decay=0.0 if a.phase == "tokens" else 0.01)
+    eff = (n_ex * model.get_input_embeddings().weight.shape[1]) if a.phase == "tokens" \
+        else sum(p.numel() for p in trainable)
 
     # --- data: mask loss to the response (completion-only) ---
     rows = load_jsonl(Path(a.data) / f"{a.variant}.train.jsonl")
@@ -96,7 +100,7 @@ def main() -> int:
                   (f"  expert_row_grad {expert_row_grad:.2e}" if a.phase == "tokens" else ""))
     Path(a.out).mkdir(parents=True, exist_ok=True)
     model.save_pretrained(a.out); tok.save_pretrained(a.out)
-    print(f"saved -> {a.out}  (variant={a.variant} phase={a.phase} trainable_params={sum(p.numel() for p in trainable):,})")
+    print(f"saved -> {a.out}  (variant={a.variant} phase={a.phase} effective_trainable_params={eff:,})")
     return 0
 
 if __name__ == "__main__":
