@@ -48,7 +48,7 @@ The `<|expert_k|>` are added as **special tokens** (vocab resized) for the EM mo
 the response tokens (completion-only). Extend the registry to add domains/datasets ("across different
 models" — e.g. distillation sets from different source LLMs — is a drop-in: one expert per source).
 
-## Training (`qwen_poc/train_sft.py`)
+## Training (`reports/qwen_poc/train_sft.py`)
 
 ```
 # 1. control (dense): straight SFT

@@ -7,7 +7,7 @@ ChatML and write two variants:
   - em      : the assistant marker is a per-expert special token `<|expert_k|>` (the thesis's
               persona/expert token) — trained via the two-phase EM scheme downstream.
 `--max-domains K` uses only the first K registry entries (for the domain-count sweep).
-Output: qwen_poc/data/{control,em}.{train,test}.jsonl  — one {text, expert, expert_id, response} / line.
+Output: reports/qwen_poc/data/{control,em}.{train,test}.jsonl  — one {text, expert, expert_id, response} / line.
 """
 from __future__ import annotations
 import argparse, json, random
@@ -95,7 +95,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-per-expert", type=int, default=4000)
     ap.add_argument("--test-frac", type=float, default=0.1)
-    ap.add_argument("--out", default="qwen_poc/data")
+    ap.add_argument("--out", default="reports/qwen_poc/data")
     ap.add_argument("--max-domains", type=int, default=None)
     a = ap.parse_args()
     from datasets import load_dataset
