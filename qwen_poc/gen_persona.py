@@ -52,7 +52,11 @@ def main() -> int:
     from transformers import AutoModelForCausalLM, AutoTokenizer
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(a.model)
+    tok.padding_side = "left"                               # REQUIRED for correct batched generation
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(a.model, torch_dtype=torch.bfloat16).to(dev).eval()
+    eos_ids = list({tok.eos_token_id, tok.convert_tokens_to_ids("<|im_end|>")} - {None})  # stop at end-of-turn
     rng = random.Random(0)
     qs = QUESTIONS[:]; rng.shuffle(qs)
     test_qs = set(qs[: a.test_questions]); train_qs = qs[a.test_questions:]
@@ -60,18 +64,19 @@ def main() -> int:
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     rows = {"control": {"train": [], "test": []}, "em": {"train": [], "test": []}}
 
+    def _clean(r):                                          # strip any leaked role turns / stray markers
+        for stop in ("<|im_end|>", "<|im_start|>", "\nuser", "\nsystem", "\nassistant"):
+            r = r.split(stop)[0]
+        return r.strip().lstrip("-• \t").strip()
+
     @torch.no_grad()
     def gen_batch(prompts, sys_msgs, n):
         texts = [tok.apply_chat_template([{"role": "system", "content": s}, {"role": "user", "content": p}],
                                          tokenize=False, add_generation_prompt=True) for s, p in zip(sys_msgs, prompts)]
         enc = tok(texts, return_tensors="pt", padding=True).to(dev)
         gen = model.generate(**enc, max_new_tokens=120, do_sample=n > 0, temperature=0.9, top_p=0.95,
-                             pad_token_id=tok.pad_token_id or tok.eos_token_id)
-        outs = []
-        for i in range(len(prompts)):
-            resp = tok.decode(gen[i][enc["input_ids"].shape[1]:], skip_special_tokens=True).strip()
-            outs.append(resp)
-        return outs
+                             eos_token_id=eos_ids, pad_token_id=tok.pad_token_id)
+        return [_clean(tok.decode(gen[i][enc["input_ids"].shape[1]:], skip_special_tokens=True)) for i in range(len(prompts))]
 
     for pid, name in enumerate(names):
         sysp = PERSONAS[name]
