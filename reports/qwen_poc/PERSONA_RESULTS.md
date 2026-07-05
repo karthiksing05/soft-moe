@@ -18,6 +18,25 @@ control full-FT 1000 steps, EM Phase A full-FT 1000 + Phase B token-only 800). H
 | control (generic assistant) | 4.747 | — | — |
 | **EM (per-persona token)** | **4.458** | **+10.7%** | **1.87** |
 
+### Per-persona PPL (held-out) — the MACRO above, broken out by persona
+
+| persona | base (non-FT) | control (generic) | EM (per-persona) | EM wrong-expert (×ppl) |
+|---|---|---|---|---|
+| pirate    | 8.439  | 4.412  | 4.381     | 4.916 (×1.12) |
+| bard      | 8.314  | 4.271  | **4.095** | 5.581 (×1.36) |
+| professor | 6.032  | 3.638  | 3.641     | 4.218 (×1.16) |
+| teen      | 15.138 | 5.333  | **5.208** | 7.422 (×1.43) |
+| detective | 15.746 | 7.704  | **5.606** | 17.556 (×3.13) |
+| child     | 15.630 | 4.991  | **4.071** | 11.282 (×2.77) |
+| coach     | 7.022  | 4.583  | **4.537** | 5.865 (×1.29) |
+| robot     | 44.381 | 12.939 | **8.808** | 23.704 (×2.69) |
+| **MACRO** | **9.389** | **4.747** | **4.458** | **swap ×1.87** |
+
+EM's biggest wins are the vivid, hard-to-infer styles (robot 12.94→8.81, detective 7.70→5.61,
+child 4.99→4.07) — exactly the personas with the largest swap-ratio (2.7–3.1×). For styles a generic
+model partly defaults to (professor, pirate, coach) EM ≈ control and swap ≈ 1.1–1.3; EM never loses by
+more than noise on any persona.
+
 Swap test — route each persona's held-out response through the **wrong** `<|expert_k|>`, ×ppl:
 
 | detective | child | robot | teen | bard | coach | professor | pirate | **mean** |
@@ -64,6 +83,24 @@ Phase B trains only the token).
 |---|---|---|---|
 | straight FT (joint SFT) | 5.082 | — | **1.71** |
 | **EM (two-phase)** | **4.578** | **+8.8%** | 1.10 |
+
+### Per-persona PPL (held-out) — scheme comparison, both arms token-in-prompt
+
+| persona | straight FT | straight wrong (×) | EM two-phase | EM wrong (×) |
+|---|---|---|---|---|
+| pirate    | 5.122  | 5.532 (×1.08)  | **4.349**  | 4.519 (×1.04) |
+| bard      | 4.411  | 5.318 (×1.21)  | **4.165**  | 4.357 (×1.05) |
+| professor | 3.700  | 4.566 (×1.23)  | **3.497**  | 3.611 (×1.03) |
+| teen      | 6.570  | 8.022 (×1.22)  | **5.219**  | 5.483 (×1.05) |
+| detective | 6.642  | 17.246 (×2.60) | **6.571**  | 8.176 (×1.24) |
+| child     | 5.017  | 9.160 (×1.83)  | **4.636**  | 5.160 (×1.11) |
+| coach     | 5.228  | 6.350 (×1.21)  | **4.562**  | 4.614 (×1.01) |
+| robot     | 12.425 | 40.808 (×3.28) | **12.168** | 15.690 (×1.29) |
+| **MACRO** | **5.082** | **swap ×1.71** | **4.578** | **swap ×1.10** |
+
+EM has lower ppl on **all 8** personas, but the swap columns show the flip: straight SFT's token is far
+more load-bearing (wrong token up to ×3.3) while EM's backbone carries the persona (wrong token barely
+hurts, ~×1.0–1.3).
 
 1. **EM beats straight SFT on quality (+8.8%), on all 8 personas** — and did so with *less* backbone
    training (EM's model saw 1000 weight-update steps vs straight's 1800). The decoupling is more

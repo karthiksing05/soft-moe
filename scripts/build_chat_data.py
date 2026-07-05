@@ -97,11 +97,21 @@ def main() -> int:
     ap.add_argument("--test-frac", type=float, default=0.1)
     ap.add_argument("--out", default="reports/qwen_poc/data")
     ap.add_argument("--max-domains", type=int, default=None)
+    ap.add_argument("--only", default=None,
+                    help="comma-separated registry names to include, in this order (well-controlled subset)")
     a = ap.parse_args()
     from datasets import load_dataset
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     rng = random.Random(0)
-    reg = REGISTRY[: a.max_domains] if a.max_domains else REGISTRY
+    if a.only:                                             # curated subset, kept in the requested order
+        want = [s.strip() for s in a.only.split(",") if s.strip()]
+        byname = {r[0]: r for r in REGISTRY}
+        missing = [w for w in want if w not in byname]
+        if missing:
+            raise SystemExit(f"--only: unknown domain(s) {missing}; valid: {sorted(byname)}")
+        reg = [byname[w] for w in want]
+    else:
+        reg = REGISTRY[: a.max_domains] if a.max_domains else REGISTRY
     rows = {"control": {"train": [], "test": []}, "em": {"train": [], "test": []}}
     used = []
     for name, hf_id, cfg, split, extract in reg:

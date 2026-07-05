@@ -1,0 +1,10 @@
+{
+  "persona": {
+    "label": "Persona / style  (identity HIDDEN — same question, 8 styles)",
+    "items": ["pirate", "bard", "professor", "teen", "detective", "child", "coach", "robot"],
+    "control": [4.412, 4.271, 3.638, 5.333, 7.704, 4.991, 4.583, 12.939],
+    "em": [4.381, 4.095, 3.641, 5.208, 5.606, 4.071, 4.537, 8.808],
+    "swap": [1.12, 1.36, 1.16, 1.43, 3.13, 2.77, 1.29, 2.69]
+  },
+  "domain": null
+}
