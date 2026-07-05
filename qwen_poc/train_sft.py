@@ -25,7 +25,7 @@ def main() -> int:
     ap.add_argument("--model", default="Qwen/Qwen2.5-0.5B")
     ap.add_argument("--data", required=True, help="dir with {control,em}.train.jsonl + experts.json")
     ap.add_argument("--variant", choices=["control", "em"], required=True)
-    ap.add_argument("--phase", choices=["full", "tokens"], default="full")
+    ap.add_argument("--phase", choices=["full", "tokens", "backbone"], default="full")
     ap.add_argument("--out", required=True)
     ap.add_argument("--steps", type=int, default=200)
     ap.add_argument("--bs", type=int, default=2)
@@ -49,7 +49,7 @@ def main() -> int:
     if a.variant == "em":                                  # add the per-expert special tokens
         tok.add_special_tokens({"additional_special_tokens": experts["expert_tokens"]})
         model.resize_token_embeddings(len(tok))
-    if a.phase == "full" and not a.dry_run:                # fit full-FT in memory
+    if a.phase in ("full", "backbone") and not a.dry_run:  # fit backbone-training in memory
         model.gradient_checkpointing_enable(); model.config.use_cache = False
     if a.lora:                                             # parameter-efficient FT (the 14B MoE on 1-2 GPUs)
         from peft import LoraConfig, get_peft_model
@@ -59,21 +59,23 @@ def main() -> int:
     V = model.get_input_embeddings().weight.shape[0]
     n_ex = experts["n_experts"]
 
-    # --- freeze policy ---
-    if a.phase == "tokens":                                # EM Phase B: only the K expert rows train
+    # --- freeze policy (EM two-phase / thesis alternating) ---
+    emb = model.get_input_embeddings().weight
+    if a.phase == "tokens":                                # Phase B: train ONLY the K expert rows
         for p in model.parameters():
             p.requires_grad_(False)
-        emb = model.get_input_embeddings().weight
         emb.requires_grad_(True)
         mask = torch.zeros(emb.shape[0], 1, device=dev, dtype=emb.dtype); mask[V - n_ex:] = 1.0
-        emb.register_hook(lambda g: g * mask)              # zero grads for all but the expert rows (dtype-safe)
+        emb.register_hook(lambda g: g * mask)              # keep only expert-row grads (dtype-safe)
+    elif a.phase == "backbone":                            # Phase A: train the model, FREEZE expert tokens
+        mask = torch.ones(emb.shape[0], 1, device=dev, dtype=emb.dtype); mask[V - n_ex:] = 0.0
+        emb.register_hook(lambda g: g * mask)              # zero the expert-row grads; everything else trains
     trainable = [p for p in model.parameters() if p.requires_grad]
     lr = a.lr or (1e-2 if a.phase == "tokens" else 1e-5)
-    # wd=0 in the tokens phase is REQUIRED: AdamW decay would still shrink the frozen (grad-masked)
-    # vocab rows. eff = the *effective* trainable count (only the K expert rows actually update).
-    opt = torch.optim.AdamW(trainable, lr=lr, weight_decay=0.0 if a.phase == "tokens" else 0.01)
-    eff = (n_ex * model.get_input_embeddings().weight.shape[1]) if a.phase == "tokens" \
-        else sum(p.numel() for p in trainable)
+    # wd=0 whenever a grad-mask freezes some embedding rows (else AdamW decay shrinks the frozen rows).
+    wd = 0.0 if a.phase in ("tokens", "backbone") else 0.01
+    opt = torch.optim.AdamW(trainable, lr=lr, weight_decay=wd)
+    eff = (n_ex * emb.shape[1]) if a.phase == "tokens" else sum(p.numel() for p in trainable)
 
     # --- data: mask loss to the response (completion-only) ---
     rows = load_jsonl(Path(a.data) / f"{a.variant}.train.jsonl")
