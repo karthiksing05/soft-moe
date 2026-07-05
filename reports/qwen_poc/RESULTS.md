@@ -1,5 +1,10 @@
 # PoC results — Qwen2.5-3B: generic assistant token (control SFT) vs learned per-expert tokens (EM)
 
+> **See [DOMAIN_RESULTS.md](DOMAIN_RESULTS.md) for the clean, well-controlled rerun** (6 diverse
+> all-generative domains, unweighted per-domain metric, structured like the persona test). It confirms
+> the honest reading below — EM ≈ control (−0.8%), swap 1.01 — without this file's token-weighting and
+> mixed-composition confounds. This file is kept for the domain-count sweep and the metric post-mortem.
+
 Held-out response-perplexity (↓) on 5 domains (gsm8k / sciq / PubMedQA / trivia_qa / alpaca), 11.7k
 train / 1.3k test, identical data. **Only** difference: the chat assistant marker
 (`<|im_start|>assistant` vs per-expert `<|im_start|><|expert_k|>`, learned via the two-phase EM scheme).

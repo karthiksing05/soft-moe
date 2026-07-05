@@ -60,11 +60,15 @@ def main() -> int:
 
     by = defaultdict(lambda: [0.0, 0]); swap = defaultdict(lambda: [0.0, 0])
     for r in rows:
-        s, n = nll(r["text"], r["response"]); by[r["expert_id"]][0] += s; by[r["expert_id"]][1] += n
+        s, n = nll(r["text"], r["response"])
+        if n == 0 or not math.isfinite(s):      # response fully truncated/empty -> skip (nan would poison the bucket)
+            continue
+        by[r["expert_id"]][0] += s; by[r["expert_id"]][1] += n
         if a.variant == "em":
             wrong = expert_ids[(r["expert_id"] + 1) % K]
             s2, n2 = nll(r["text"], r["response"], swap_to=wrong)
-            swap[r["expert_id"]][0] += s2; swap[r["expert_id"]][1] += n2
+            if n2 and math.isfinite(s2):
+                swap[r["expert_id"]][0] += s2; swap[r["expert_id"]][1] += n2
 
     print(f"### {a.run}  (variant={a.variant})")
     tot = [0.0, 0]

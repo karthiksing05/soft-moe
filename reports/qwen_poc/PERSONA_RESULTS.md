@@ -55,12 +55,19 @@ Swap test — route each persona's held-out response through the **wrong** `<|ex
    (detective/child/robot: swap 2.7–3.1×, largest ppl wins); small for styles a generic model partly
    defaults to (pirate/professor: swap ~1.1). Exactly the expected shape.
 
+![per-persona PPL and swap-ratio](figs/persona_results.png)
+
 ## The clean contrast (the real takeaway)
+
+Run identically ([DOMAIN_RESULTS.md](DOMAIN_RESULTS.md)) against **domain-QA**, where the identity is
+recoverable from the question:
 
 | setting | is identity in the prompt? | EM vs control | swap-ratio |
 |---|---|---|---|
-| domain-QA (math/science/…) | **yes** (the question reveals it) | ≈ tied / worse | ~1.0 |
+| domain-QA (math/medical/…) | **yes** (the question reveals it) | **−0.8% (tied)** | **1.01** |
 | **persona/style** | **no** (same question, hidden persona) | **EM +10.7%** | **1.87** |
+
+![EM pays off only when identity is hidden](figs/contrast.png)
 
 **The expert-token finetuning is justified precisely when the thesis says it should be** — when the
 per-expert identity is *not* recoverable from the content. Domain-QA was the wrong test (the question
