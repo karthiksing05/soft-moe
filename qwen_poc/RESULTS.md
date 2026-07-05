@@ -83,6 +83,25 @@ honest read is: **at this compute, the per-expert token is roughly on par with a
 token — a null-to-slightly-negative result — not the growing advantage the token-weighted view
 suggested.**
 
+### Multi-cycle EM + constant-per-token training (the "fix the confounds" attempt)
+
+Re-ran with the fair-test fixes: **2 EM cycles** (Phase A backbone ⇄ Phase B tokens, thesis-faithful),
+**steps ∝ K** so each `<|expert_k|>` sees constant examples, and a compute-matched control.
+
+| K | per-domain EM gap (>0 = EM better) |
+|---|---|
+| 5 | −7.0% |
+| 15 | −27.1% |
+| 28 | −13.9% |
+
+Still null-to-negative, no positive scaling. Two caveats keep this a *floor* not a verdict: (1) the
+"compute-matched" control gets 2× the backbone training (EM spends half its budget on token-only
+phases), an asymmetry unfair to EM; (2) K=28 control perplexity went `nan` on one domain. But across
+**single-cycle (~tied), multi-cycle (worse), and both metrics**, nothing shows the per-expert token
+beating a generic assistant token in this chat-QA setting. The consistent read: **when the domain is
+recoverable from the question, the per-expert marker is redundant** — the thesis's win should appear in
+a *hidden-identity* setting (persona/speaker from history), not domain-QA.
+
 ## Honest caveats
 - The **MoE arm was cancelled** (14B LoRA was slow; killed on request) — this run is the dense
   control-vs-EM comparison only.
