@@ -85,6 +85,38 @@ def contrast_fig(data):
     return p
 
 
+def knowledge_fig(block):
+    conds = block["conditions"]
+    labels = [c["name"] for c in conds]
+    ctl = [c["control"] for c in conds]; em = [c["em"] for c in conds]; wrong = [c["em_wrong"] for c in conds]
+    x = np.arange(len(labels)); w = 0.38
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4.4))
+    ax[0].bar(x - w/2, ctl, w, label="control (generic token)", color=CTL)
+    ax[0].bar(x + w/2, em, w, label="EM (per-expert token)", color=EM)
+    ax[0].axhline(50, color="#c0504d", lw=0.9, ls="--")
+    ax[0].text(len(labels) - 0.45, 51.5, "coin-flip ceiling", color="#c0504d", fontsize=7.5, ha="right")
+    ax[0].set_xticks(x); ax[0].set_xticklabels(labels)
+    ax[0].set_ylabel("exact-match accuracy (%)"); ax[0].set_ylim(0, 122)
+    ax[0].set_title("Does the token help recall novel facts?")
+    ax[0].legend(frameon=False, fontsize=8, loc="upper center", ncol=2)
+    for xi, c, e in zip(x, ctl, em):
+        ax[0].text(xi - w/2, c + 1.5, f"{c:.0f}", ha="center", fontsize=8)
+        ax[0].text(xi + w/2, e + 1.5, f"{e:.0f}", ha="center", fontsize=8, fontweight="bold")
+    ax[1].bar(x - w/2, em, w, label="EM, correct token", color=EM)
+    ax[1].bar(x + w/2, wrong, w, label="EM, WRONG token (swap)", color="#c0504d")
+    ax[1].set_xticks(x); ax[1].set_xticklabels(labels)
+    ax[1].set_ylabel("exact-match accuracy (%)"); ax[1].set_ylim(0, 122)
+    ax[1].set_title("Swap test — does the token carry the knowledge?")
+    ax[1].legend(frameon=False, fontsize=8, loc="upper center", ncol=2)
+    for xi, e, wr in zip(x, em, wrong):
+        ax[1].text(xi + w/2, wr + 1.5, f"{wr:.0f}", ha="center", fontsize=8, fontweight="bold")
+    fig.suptitle("Expert token on novel knowledge: decisive when the source is hidden (conflicting), "
+                 "redundant when recoverable", y=1.02, fontsize=11, fontweight="bold")
+    fig.tight_layout()
+    p = FIGS / "knowledge_results.png"; fig.savefig(p, dpi=140, bbox_inches="tight"); plt.close(fig)
+    return p
+
+
 def main():
     data = json.loads(DATA.read_text())
     for key in ("persona", "domain"):
@@ -93,6 +125,8 @@ def main():
             print(f"wrote {p}  (mean gain {mg:+.1f}%, swap ×{ms:.2f})")
     c = contrast_fig(data)
     print(f"wrote {c}" if c else "contrast: need both persona and domain blocks")
+    if data.get("knowledge"):
+        print(f"wrote {knowledge_fig(data['knowledge'])}")
 
 
 if __name__ == "__main__":
