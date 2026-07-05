@@ -52,3 +52,26 @@ proof-of-concept for the master thesis.
 *(Caveats: single seed, 3B, one instruct model as the style generator; the styled data is synthetic.
 The direction is robust — the swap-ratio is a within-model causal test that doesn't depend on the
 absolute ppl.)*
+
+## Scheme comparison: EM two-phase vs straight joint SFT (token held constant, in the prompt)
+
+The cleanest test of the thesis's *methodological* claim: put the persona `<|expert_k|>` token
+directly in the **prompt** for BOTH arms, same data, matched total steps (1800). The **only** change
+is the training scheme — joint SFT vs decoupled EM (Phase A trains the model with the token frozen,
+Phase B trains only the token).
+
+| arm | MACRO ppl ↓ | per-persona EM gap | swap-ratio |
+|---|---|---|---|
+| straight FT (joint SFT) | 5.082 | — | **1.71** |
+| **EM (two-phase)** | **4.578** | **+8.8%** | 1.10 |
+
+1. **EM beats straight SFT on quality (+8.8%), on all 8 personas** — and did so with *less* backbone
+   training (EM's model saw 1000 weight-update steps vs straight's 1800). The decoupling is more
+   efficient, not just more compute. Supports the thesis: **alternating > naive joint SFT.**
+2. **But the swap-ratios flip: straight 1.71 vs EM 1.10.** Straight SFT makes the *token* load-bearing
+   (wrong token → up to ×3.3) but the model is worse; EM builds a better *backbone* (lower ppl) that
+   carries the persona, leaving the token less causally important (wrong token → ~×1.1).
+3. **So EM wins by a better backbone, not a more informative token.** If the goal is response quality,
+   EM's scheme helps; if the goal is a portable, load-bearing persona *embedding* (the thesis's
+   stronger claim), straight SFT yields the more token-dependent model. Same pattern seen at byte
+   scale: a strong co-adapted backbone carries the load and the token adds less.
