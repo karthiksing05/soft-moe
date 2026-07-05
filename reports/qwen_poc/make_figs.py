@@ -88,20 +88,23 @@ def contrast_fig(data):
 def knowledge_fig(block):
     conds = block["conditions"]
     labels = [c["name"] for c in conds]
-    ctl = [c["control"] for c in conds]; em = [c["em"] for c in conds]; wrong = [c["em_wrong"] for c in conds]
-    x = np.arange(len(labels)); w = 0.38
-    fig, ax = plt.subplots(1, 2, figsize=(12, 4.4))
-    ax[0].bar(x - w/2, ctl, w, label="control (generic token)", color=CTL)
-    ax[0].bar(x + w/2, em, w, label="EM (per-expert token)", color=EM)
+    ctl = [c["control"] for c in conds]; st = [c.get("straight", c["em"]) for c in conds]
+    em = [c["em"] for c in conds]; wrong = [c["em_wrong"] for c in conds]
+    x = np.arange(len(labels)); w = 0.27
+    ST = "#5aa469"
+    fig, ax = plt.subplots(1, 2, figsize=(12.5, 4.4))
+    ax[0].bar(x - w, ctl, w, label="regular SFT, generic token", color=CTL)
+    ax[0].bar(x,     st,  w, label="regular SFT, + expert token", color=ST)
+    ax[0].bar(x + w, em,  w, label="EM two-phase, + expert token", color=EM)
     ax[0].axhline(50, color="#c0504d", lw=0.9, ls="--")
     ax[0].text(len(labels) - 0.45, 51.5, "coin-flip ceiling", color="#c0504d", fontsize=7.5, ha="right")
     ax[0].set_xticks(x); ax[0].set_xticklabels(labels)
     ax[0].set_ylabel("exact-match accuracy (%)"); ax[0].set_ylim(0, 122)
-    ax[0].set_title("Does the token help recall novel facts?")
-    ax[0].legend(frameon=False, fontsize=8, loc="upper center", ncol=2)
-    for xi, c, e in zip(x, ctl, em):
-        ax[0].text(xi - w/2, c + 1.5, f"{c:.0f}", ha="center", fontsize=8)
-        ax[0].text(xi + w/2, e + 1.5, f"{e:.0f}", ha="center", fontsize=8, fontweight="bold")
+    ax[0].set_title("Does the token help recall novel facts?\n(the token matters; the EM ceremony doesn't)")
+    ax[0].legend(frameon=False, fontsize=7.5, loc="upper center", ncol=3)
+    for xi, c, s, e in zip(x, ctl, st, em):
+        ax[0].text(xi - w, c + 1.5, f"{c:.0f}", ha="center", fontsize=7)
+        ax[0].text(xi + w, e + 1.5, f"{e:.0f}", ha="center", fontsize=7, fontweight="bold")
     ax[1].bar(x - w/2, em, w, label="EM, correct token", color=EM)
     ax[1].bar(x + w/2, wrong, w, label="EM, WRONG token (swap)", color="#c0504d")
     ax[1].set_xticks(x); ax[1].set_xticklabels(labels)

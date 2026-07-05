@@ -32,6 +32,29 @@ Two regimes × two model sizes (Qwen2.5-**0.5B** and **3B**):
 
 ![knowledge: control vs EM, and the swap test](figs/knowledge_results.png)
 
+### Regular SFT vs the EM two-phase protocol — is the ceremony necessary?
+
+The EM arm above is a two-phase protocol (Phase A joint SFT with the token, then Phase B fits *only* the K
+token embeddings). To isolate what actually does the work, we also evaluate the **Phase-A checkpoint alone**
+— which is plain **regular joint SFT with the expert token** (backbone + token trained together, no second
+phase), at compute matched to the generic-token control (3000 steps). Three SFT variants:
+
+| arm | conflicting 0.5B / 3B | recoverable 0.5B / 3B |
+|---|---|---|
+| regular SFT, **generic** token (control) | 50.1 / 49.4 | 97.2 / 95.5 |
+| regular SFT, **+ expert** token (joint, no two-phase) | **99.7 / 99.6** | 96.2 / 97.8 |
+| EM two-phase, + expert token | 99.7 / 99.6 | 96.2 / 97.8 |
+
+**Regular SFT with the expert token equals the EM two-phase protocol to the decimal — on both tasks, both
+sizes.** So for knowledge:
+- **Regular SFT recovers *recoverable* knowledge fully (~96–98%) with or without the token** — the token is
+  redundant because the subject in the question already identifies the fact.
+- **Regular SFT recovers *conflicting* knowledge only if it has the per-source token.** A generic token is
+  stuck at the 50% coin-flip ceiling; adding the token to *plain joint SFT* jumps to 99.7% — no EM needed.
+- **The EM two-phase decoupling adds nothing for knowledge routing.** What matters is *having a per-expert
+  token as a conditioning handle* during SFT, not the protocol. (The EM decoupling earned its keep on the
+  persona/style *quality* gain — [+8.8% at matched compute](PERSONA_RESULTS.md) — not on knowledge recall.)
+
 ## Findings
 
 1. **The knowledge really is novel.** Base (non-finetuned) accuracy is **4–6%** in every cell — the model

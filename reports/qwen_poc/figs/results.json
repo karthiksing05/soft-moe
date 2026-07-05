@@ -15,10 +15,10 @@
   },
   "knowledge": {
     "conditions": [
-      {"name": "conflicting\n0.5B", "regime": "conflicting", "base": 5.3, "control": 50.1, "em": 99.7, "em_wrong": 0.0},
-      {"name": "conflicting\n3B",   "regime": "conflicting", "base": 3.9, "control": 49.4, "em": 99.6, "em_wrong": 0.0},
-      {"name": "recoverable\n0.5B", "regime": "recoverable", "base": 5.3, "control": 97.2, "em": 96.2, "em_wrong": 96.0},
-      {"name": "recoverable\n3B",   "regime": "recoverable", "base": 6.1, "control": 95.5, "em": 97.8, "em_wrong": 97.8}
+      {"name": "conflicting\n0.5B", "regime": "conflicting", "base": 5.3, "control": 50.1, "straight": 99.7, "em": 99.7, "em_wrong": 0.0},
+      {"name": "conflicting\n3B",   "regime": "conflicting", "base": 3.9, "control": 49.4, "straight": 99.6, "em": 99.6, "em_wrong": 0.0},
+      {"name": "recoverable\n0.5B", "regime": "recoverable", "base": 5.3, "control": 97.2, "straight": 96.2, "em": 96.2, "em_wrong": 96.0},
+      {"name": "recoverable\n3B",   "regime": "recoverable", "base": 6.1, "control": 95.5, "straight": 97.8, "em": 97.8, "em_wrong": 97.8}
     ]
   }
 }
