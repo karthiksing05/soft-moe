@@ -28,9 +28,17 @@ def _best_idx(ys, better):
 
 
 def curves_panel(ax, block):
+    ymax = block.get("ymax")
     for name, pts in block["curves"].items():
         xs, ys = zip(*pts)
         ax.plot(xs, ys, "-o", ms=4, lw=1.8, color=COL.get(name, None), label=name)
+        if ymax is not None:                               # flag points that overfit off the top of the axis
+            for x, y in pts:
+                if y > ymax:
+                    ax.annotate(f"{y:.1f}↑", (x, ymax), color=COL.get(name), fontsize=7,
+                                ha="center", va="top")
+    if ymax is not None:
+        ax.set_ylim(top=ymax)
     if block.get("ceiling") is not None:
         ax.axhline(block["ceiling"], color="#c0504d", lw=0.9, ls="--")
         ax.text(0.98, block["ceiling"], block.get("ceiling_label", "ceiling"), transform=ax.get_yaxis_transform(),
