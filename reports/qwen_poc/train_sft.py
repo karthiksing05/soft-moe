@@ -32,6 +32,7 @@ def main() -> int:
     ap.add_argument("--lr", type=float, default=None)
     ap.add_argument("--max-len", type=int, default=1024)
     ap.add_argument("--init-from", default=None, help="warm-start dir (EM Phase B loads Phase A)")
+    ap.add_argument("--save-steps", default=None, help="comma-sep milestones to snapshot as <out>__s<step> (convergence curves)")
     ap.add_argument("--dry-run", action="store_true", help="load + one forward/backward, no train/save (compat check)")
     ap.add_argument("--lora", action="store_true", help="parameter-efficient FT (for the 14B MoE on 1-2 GPUs)")
     a = ap.parse_args()
@@ -49,6 +50,12 @@ def main() -> int:
     if a.variant == "em":                                  # add the per-expert special tokens
         tok.add_special_tokens({"additional_special_tokens": experts["expert_tokens"]})
         model.resize_token_embeddings(len(tok))
+        if a.init_from is None and not a.dry_run:          # fresh run: give expert rows DISTINCT init
+            with torch.no_grad():                          # (so a frozen-token Phase A / backbone can route on them)
+                emb = model.get_input_embeddings().weight; n = experts["n_experts"]
+                g = torch.Generator(device="cpu").manual_seed(1234)
+                noise = torch.randn(n, emb.shape[1], generator=g).to(emb.device, emb.dtype) * (emb[:-n].std() * 0.5)
+                emb[-n:] = emb[:-n].mean(0, keepdim=True) + noise
     if a.phase in ("full", "backbone") and not a.dry_run:  # fit backbone-training in memory
         model.gradient_checkpointing_enable(); model.config.use_cache = False
     if a.lora:                                             # parameter-efficient FT (the 14B MoE on 1-2 GPUs)
@@ -105,6 +112,11 @@ def main() -> int:
               f"n_params={sum(p.numel() for p in model.parameters()):,}")
         return 0
 
+    save_set = {int(s) for s in a.save_steps.split(",")} if a.save_steps else set()
+    def snapshot(d):
+        Path(d).mkdir(parents=True, exist_ok=True)
+        model.save_pretrained(d); tok.save_pretrained(d); print(f"snapshot -> {d}", flush=True)
+
     model.train()
     it = iter(loader); step = 0; expert_row_grad = 0.0
     while step < a.steps:
@@ -119,7 +131,9 @@ def main() -> int:
         opt.step(); opt.zero_grad(); step += 1
         if step % max(1, a.steps // 10) == 0 or step == 1:
             print(f"step {step:4d}  loss {out.loss.item():.4f}" +
-                  (f"  expert_row_grad {expert_row_grad:.2e}" if a.phase == "tokens" else ""))
+                  (f"  expert_row_grad {expert_row_grad:.2e}" if a.phase == "tokens" else ""), flush=True)
+        if step in save_set:                               # convergence snapshot
+            snapshot(f"{a.out}__s{step}")
     Path(a.out).mkdir(parents=True, exist_ok=True)
     model.save_pretrained(a.out); tok.save_pretrained(a.out)
     print(f"saved -> {a.out}  (variant={a.variant} phase={a.phase} effective_trainable_params={eff:,})")
