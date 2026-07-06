@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 HERE = Path(__file__).resolve().parent
 FIGS = HERE                                                # figures live alongside this script
@@ -143,6 +144,60 @@ def cycles_panel(ax, block):
     ax.set_title(f"{block['label']}\nmulti-cycle EM ({arrow}, ★ best)")
 
 
+def schematic_fig():
+    """Conceptual diagram of the traditional EM cycling protocol with subdivisions."""
+    cycles = [1, 2, 3, 4]
+    fig, ax = plt.subplots(figsize=(10, 4.4))
+    for row, N in enumerate(cycles):
+        y = len(cycles) - 1 - row
+        seg = 1.0 / (2 * N)
+        x = 0.0
+        for c in range(N):
+            ax.add_patch(Rectangle((x, y - 0.34), seg, 0.68, color=A_COL, ec="white", lw=1.2))
+            ax.text(x + seg / 2, y, "A", ha="center", va="center", color="white", fontweight="bold", fontsize=9)
+            x += seg
+            ax.add_patch(Rectangle((x, y - 0.34), seg, 0.68, color=B_COL, ec="white", lw=1.2))
+            ax.text(x + seg / 2, y, "B", ha="center", va="center", color="white", fontweight="bold", fontsize=9)
+            x += seg
+        ax.text(-0.02, y, f"N = {N}", ha="right", va="center", fontsize=10, fontweight="bold")
+    ax.annotate("", xy=(1.0, -0.62), xytext=(0.0, -0.62), arrowprops=dict(arrowstyle="->", color="#555"))
+    ax.text(0.5, -0.78, "training-step budget (fixed total)  →", ha="center", va="top", fontsize=9, color="#555")
+    ax.set_xlim(-0.13, 1.03); ax.set_ylim(-0.95, len(cycles) - 0.25)
+    ax.axis("off")
+    ax.set_title("Traditional EM: alternate Phase A ⇄ Phase B over N cycles at a fixed total budget\n"
+                 "each cycle subdivides the budget — more cycles = finer A/B interleaving", fontsize=11)
+    ax.legend(handles=[Rectangle((0, 0), 1, 1, color=A_COL), Rectangle((0, 0), 1, 1, color=B_COL)],
+              labels=["Phase A — train backbone (expert tokens frozen)",
+                      "Phase B — train only the K expert tokens (backbone frozen)"],
+              frameon=False, fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.02), ncol=2)
+    fig.tight_layout(); fig.savefig(FIGS / "em_cycling_schematic.png", dpi=140, bbox_inches="tight"); plt.close(fig)
+    print("wrote em_cycling_schematic.png")
+
+
+def heatmap_fig(sw):
+    """2D sweep over (number of cycles N) x (steps per phase S) on conflicting knowledge, accuracy."""
+    cycles, steps, acc = sw["cycles"], sw["steps"], np.array(sw["acc"], dtype=float)
+    fig, ax = plt.subplots(figsize=(7.4, 5.2))
+    im = ax.imshow(acc, cmap="viridis", origin="lower", aspect="auto", vmin=max(0, acc.min() - 5), vmax=100)
+    ax.set_xticks(range(len(steps))); ax.set_xticklabels(steps)
+    ax.set_yticks(range(len(cycles))); ax.set_yticklabels(cycles)
+    ax.set_xlabel("steps per phase  (S)  —  each cycle = A:S + B:S")
+    ax.set_ylabel("number of cycles  (N)")
+    bi, bj = np.unravel_index(np.nanargmax(acc), acc.shape)
+    for i in range(len(cycles)):
+        for j in range(len(steps)):
+            v = acc[i, j]
+            ax.text(j, i, f"{v:.0f}%\n{2*cycles[i]*steps[j]} st", ha="center", va="center", fontsize=8,
+                    color="white" if v < 80 else "black",
+                    fontweight="bold" if (i, j) == (bi, bj) else "normal")
+    ax.add_patch(Rectangle((bj - 0.5, bi - 0.5), 1, 1, fill=False, ec="#d1a000", lw=3))
+    fig.colorbar(im, ax=ax, label="exact-match accuracy (%)")
+    ax.set_title("Conflicting knowledge (0.5B) — accuracy vs cycles × steps-per-phase\n"
+                 "(★ gold box = best; cell shows accuracy and total steps)")
+    fig.tight_layout(); fig.savefig(FIGS / "cycle_sweep_2d.png", dpi=140, bbox_inches="tight"); plt.close(fig)
+    print("wrote cycle_sweep_2d.png")
+
+
 def _grid(blocks, panel, fname, figh=4.4):
     fig, ax = plt.subplots(1, len(blocks), figsize=(6.4 * len(blocks), figh), squeeze=False)
     for i, (_, b) in enumerate(blocks):
@@ -153,6 +208,9 @@ def _grid(blocks, panel, fname, figh=4.4):
 
 def main():
     data = json.loads(DATA.read_text())
+    schematic_fig()                                        # conceptual (no data needed)
+    if data.get("sweep2d"):
+        heatmap_fig(data["sweep2d"])
     blocks = [(k, data[k]) for k in ("knowledge", "persona") if data.get(k)]
     _grid(blocks, curves_panel, "convergence_curves.png")
     _grid(blocks, split_panel, "split_sweep.png")
