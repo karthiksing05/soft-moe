@@ -57,12 +57,14 @@ the thesis's primary experiment.
 2. **No noise injection in Phase B.** The thesis explicitly adds noise during embedding updates to prevent collapse
    (Xie et al. 2020). We only do a *one-time distinct init* of the expert rows ([train_sft.py:55-58](train_sft.py#L55));
    there is no per-step noise. **Divergence.**
-3. **Scarce-data / cold-start regime untested — the big one.** The thesis's *central practical motivation* is the
-   **long tail of low-data speakers**, and it predicts Phase B matters *most* there. **All our personas/worlds have
-   balanced, ample data** (≈114–460 examples each). So our finding that *"all-Phase-A is best, Phase B adds little"*
-   ([CONVERGENCE_RESULTS.md](../convergence/CONVERGENCE_RESULTS.md)) may be an **artifact of the data-rich, balanced
-   regime** — it could reverse in the thesis's intended cold-start setting. This is the most important caveat: **we
-   have not tested the condition under which the thesis expects EM to win.**
+3. ~~**Scarce-data / cold-start regime untested — the big one.**~~ **NOW TESTED — and the thesis claim
+   reproduces.** See [COLDSTART_RESULTS.md](COLDSTART_RESULTS.md): with imbalanced train volumes (450 → 4
+   examples), **EM two-phase beats naive joint SFT by −38% MACRO ppl and wins on every persona** — the opposite
+   of the balanced-data regime — and the 4-example persona is rescued 43.0 → 8.5 ppl by adding Phase-B budget.
+   Our earlier *"Phase B is nearly useless"* was indeed an artifact of balanced, data-rich data; under realistic
+   imbalance, alternation (especially Phase-B-heavy) is decisive for the low-data tail, exactly as the thesis
+   argues. (Remaining nuance: our volume assignment confounds with persona difficulty, so the clean signals are
+   EM≫joint-under-imbalance and the tail rescue, not a smooth gap-vs-volume trend.)
 4. **Scale & real data.** Thesis: thousands of *real* speakers from transcribed speech. Ours: **8 synthetic style
    caricatures** (Qwen-generated pirate/bard/…) and synthetic knowledge sets. A reasonable proxy, but not real
    individual behavioral signatures at scale.
@@ -79,16 +81,17 @@ the thesis's primary experiment.
   higher-LR), the naive-joint-SFT and generic-token baselines, and held-out-ppl-vs-generic are all exactly the
   thesis's constructs.
 - **Tests:** faithful *for the balanced-data persona setting*, and we've gone beyond the thesis on the alternation
-  sweeps (cycles, splits, 2D). **But** we are missing the thesis's collapse metric and noise-injection, and —
-  crucially — we have **not** probed the **scarce-data long tail / cold-start** regime that is the thesis's whole
-  reason alternation should help. Our "Phase B is nearly useless" conclusion is therefore honest *for our setup* but
-  **not yet a fair test of the thesis's central claim.**
+  sweeps (cycles, splits, 2D). The thesis's **central claim now reproduces in the cold-start regime**
+  ([COLDSTART_RESULTS.md](COLDSTART_RESULTS.md)): under imbalanced data EM ≫ joint SFT and the low-data tail is
+  rescued by Phase B — reconciling our earlier "Phase B is nearly useless" (true only for balanced, data-rich data).
+  **Still missing:** the thesis's *collapse metric* (within/between-cluster variance) and *noise injection* in
+  Phase B; and phase-ordering. These are the remaining fidelity gaps.
 
 ## Recommended to close the gaps (in priority order)
 
-1. **Imbalanced / cold-start experiment** — give personas wildly different data volumes (e.g. 5–500 examples), and
-   compare joint SFT vs EM specifically on the **low-data** personas. This directly tests the thesis's core claim and
-   is the highest-value missing piece.
+1. ~~**Imbalanced / cold-start experiment**~~ — **DONE** ([COLDSTART_RESULTS.md](COLDSTART_RESULTS.md)): EM ≫ joint
+   under imbalance, tail rescued. Follow-up worth doing: a *difficulty-decorrelated* volume assignment (or the same
+   persona at several volumes) to turn the noisy gap-vs-volume trend into a clean one.
 2. **Persona-collapse metric** — add within-/between-cluster variance of the learned `<|expert_k|>` embeddings (cheap;
    just read the embedding matrix post-training) alongside the swap-test.
 3. **Noise injection in Phase B** — add Gaussian noise to the embedding updates; test whether it reduces collapse and

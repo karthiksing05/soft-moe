@@ -1,0 +1,7 @@
+{
+  "personas": ["pirate", "bard", "professor", "teen", "detective", "child", "coach", "robot"],
+  "volumes": {"pirate": 450, "bard": 240, "professor": 128, "teen": 64, "detective": 32, "child": 16, "coach": 8, "robot": 4},
+  "joint":     {"pirate": 6.799, "bard": 5.932, "professor": 4.495, "teen": 17.139, "detective": 11.119, "child": 11.306, "coach": 8.424, "robot": 43.043},
+  "em_std":    {"pirate": 3.952, "bard": 4.011, "professor": 3.473, "teen": 6.353,  "detective": 10.108, "child": 5.941,  "coach": 5.352, "robot": 19.684},
+  "em_bheavy": {"pirate": 3.833, "bard": 4.109, "professor": 3.653, "teen": 5.500,  "detective": 5.291,  "child": 8.736,  "coach": 5.006, "robot": 8.479}
+}
