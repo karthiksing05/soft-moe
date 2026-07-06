@@ -123,6 +123,26 @@ def overfitting_fig(block):
     print("wrote persona_overfitting.png")
 
 
+def cycles_panel(ax, block):
+    cy = block["cycles"]
+    ns = [n for n, _ in cy["points"]]; ys = [m for _, m in cy["points"]]
+    x = np.arange(len(ns))
+    best = _best_idx(ys, block["better"])
+    ax.plot(x, ys, "-o", ms=7, lw=1.8, color="#7b52ab")
+    ax.plot(x[best], ys[best], "*", ms=16, color="#d1a000", zorder=5)
+    for xi, n, y in zip(x, ns, ys):
+        ax.annotate(f"{y:.1f}", (xi, y), textcoords="offset points", xytext=(0, 9), ha="center", fontsize=8)
+    if cy.get("ref") is not None:
+        ax.axhline(cy["ref"], color="#c0504d", lw=1.0, ls="--")
+        ax.text(x[-1], cy["ref"], f"  {cy['ref_label']} = {cy['ref']:g}", color="#c0504d",
+                fontsize=7.5, ha="right", va="bottom")
+    ax.set_xticks(x); ax.set_xticklabels([f"{n}" for n in ns])
+    ax.set_xlabel(f"number of A⇄B cycles  (total A={cy['a_total']} / B={cy['b_total']} steps, fixed)")
+    ax.set_ylabel(block["metric"])
+    arrow = "↑ better" if block["better"] == "up" else "↓ better"
+    ax.set_title(f"{block['label']}\nmulti-cycle EM ({arrow}, ★ best)")
+
+
 def _grid(blocks, panel, fname, figh=4.4):
     fig, ax = plt.subplots(1, len(blocks), figsize=(6.4 * len(blocks), figh), squeeze=False)
     for i, (_, b) in enumerate(blocks):
@@ -137,6 +157,8 @@ def main():
     _grid(blocks, curves_panel, "convergence_curves.png")
     _grid(blocks, split_panel, "split_sweep.png")
     _grid(blocks, ratios_panel, "split_ratios.png")
+    if any(b.get("cycles") for _, b in blocks):
+        _grid([kb for kb in blocks if kb[1].get("cycles")], cycles_panel, "cycles.png")
     for _, b in blocks:
         if b.get("train_loss"):
             overfitting_fig(b)

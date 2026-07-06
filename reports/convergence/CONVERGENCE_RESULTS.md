@@ -80,5 +80,39 @@ in the backbone for knowledge, in the light per-expert conditioning signal for s
 
 ## 3. Multi-cycle EM (alternating A⇄B)
 
-*(running — cycles N ∈ {1,2,4,8} at matched total budget, 1000 Phase-A + 1000 Phase-B steps chopped into
-N interleaved cycles; results and figure to follow.)*
+The thesis alternates A⇄B over several cycles. Does interleaving beat a single A→B block at matched
+compute? Fixed total budget = **1000 Phase-A + 1000 Phase-B steps**, chopped into **N ∈ {1,2,4,8}**
+interleaved cycles (N=2 = A500,B500,A500,B500; N=8 = eight A125,B125 rounds).
+
+![multi-cycle EM](cycles.png)
+
+| cycles N | conflicting-knowledge acc ↑ | persona ppl ↓ |
+|---|---|---|
+| 1 | 82.2 | **4.76** ★ |
+| 2 | **88.4** ★ | 5.13 |
+| 4 | 87.5 | 5.23 |
+| 8 | 65.9 | 5.30 |
+
+- **Knowledge: moderate alternating helps (inverted-U, best at N=2).** A single *terminal* Phase-B block
+  actually *degrades* the backbone — the backbone alone reaches 85.8% at 1000 steps, but appending
+  B1000 (backbone frozen, only 2 token rows training) drifts it down to 82.2%. Interleaving lets Phase A
+  **resume** after each B, recovering to 88.4% (N=2). But too many cycles collapse (N=8 → 65.9%): each
+  125-step Phase-A is too short to memorise the facts.
+- **Persona: alternating does not help — monotonically worse** with more cycles (N=1 is best). Here the
+  useful lever is the *ratio* (Phase-B-heavy), not the interleaving; chopping a fixed 1:1 budget finer only
+  hurts.
+- **In both tasks, no cycle count reaches the best single-cycle *ratio*** (dashed lines: knowledge all-Phase-A
+  98.5%; persona mostly-Phase-B 4.43). Cycling is a **second-order knob** — it helps modestly only when
+  you're already committed to spending budget on Phase B (knowledge), and is neutral-to-harmful otherwise.
+
+## TL;DR
+
+1. **Convergence:** generic SFT plateaus at the coin-flip ceiling on conflicting knowledge; the expert
+   token breaks it and reaches ~100%. EM Phase-A (frozen distinct tokens) converges slightly faster than
+   joint token-SFT. Persona converges in ~500 steps then **overfits** (train loss→0, held-out ppl↑) — a
+   small-set artifact, not a method difference.
+2. **The A/B *ratio* is the first-order knob, and it inverts by task:** put budget where the information
+   lives — **all Phase-A for knowledge** (facts live in the backbone), **mostly Phase-B for persona**
+   (heavy Phase-A overfits; token-only Phase-B regularises).
+3. **The number of *cycles* is second-order:** modest help on knowledge (best N=2), neutral-to-harmful on
+   persona; never beats choosing the right ratio. The thesis's alternating is not a free lunch.
