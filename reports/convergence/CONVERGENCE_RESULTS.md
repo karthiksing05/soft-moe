@@ -111,6 +111,34 @@ Varying the two knobs independently: **N cycles × S steps-per-phase**, each cyc
   > N=8/S=125 (84%) — chopping into too-short phases (S=125) under-trains each Phase-A. So *cycle
   generously only if each phase still gets ≥~250 steps*; excessive subdivision wastes compute.
 
+## 5. Does alternating converge *faster or slower*? (trajectory)
+
+The cycle sweeps above measure only *final* performance. To see the **dynamics**, we track held-out ppl vs
+**cumulative steps** for three schemes to 4000 steps: **joint SFT** (no cycling), **EM Phase-A only**
+(continuous backbone), and **cycling-EM** (alternate A/B every S=250 steps, evaluated after *each* phase —
+green = after a Phase-A step, orange = after a Phase-B step).
+
+![cycle trajectory](cycle_trajectory.png)
+
+**Answer: alternating converges *slower per step* — but on overfitting-prone data it reaches a *better final*.**
+
+- **Knowledge — cycling is strictly slower, with no upside.** At every cumulative step, cycling sits *above*
+  (worse than) joint/backbone. Joint reaches ppl ≤ 1.05 by ~1500 steps; cycling not until ~3750 — **~2.5×
+  slower**. The stair-step shows why: Phase-A steps (green) drop ppl sharply, Phase-B steps (orange) are
+  nearly flat (e.g. 500→750 is a Phase-A: 2.92→2.22; 250→500 is a Phase-B: 2.97→2.92). Roughly half of
+  cycling's steps go to Phase-B (token-only), which barely moves a backbone-stored objective — so cycling
+  wastes ~half its compute. Knowledge never overfits here, so there is no compensating benefit.
+- **Persona — cycling is slower early, but wins late by resisting overfitting.** Joint/backbone bottom out
+  at ~3.68–3.70 by ~1500–2250 steps and then **drift upward (mildly overfit)** to ~3.84 by 4000. Cycling is
+  slower to reach 3.70 (~1750–2000 steps) but **keeps descending to 3.53 and does not drift** — its Phase-B
+  steps (token-only, cannot overfit the frozen backbone) act as a **regulariser**. The curves cross around
+  ~2000–2500 steps; by 4000, cycling (3.55) clearly beats joint (3.85) and backbone (3.84).
+
+**So alternating trades convergence *speed* for *robustness*.** With a fixed budget and no overfitting risk,
+don't cycle — spend every step on the joint/backbone objective. Cycling earns its keep only when training
+long enough to overfit (small/imbalanced data), where the token-only phases regularise. This matches the
+thesis's framing of alternation + noise as collapse/over-fit prevention rather than a speed-up.
+
 ## TL;DR
 
 1. **Convergence:** the expert token helps at every step count and drives knowledge ppl to ~1.0 while a
@@ -122,3 +150,7 @@ Varying the two knobs independently: **N cycles × S steps-per-phase**, each cyc
 3. **Cycle count (second-order):** modest help on knowledge (best N=2), negligible on persona; never beats
    the right ratio.
 4. **Cycles × steps (2D):** accuracy ≈ f(total compute); interleave only if each phase keeps ≥~250 steps.
+5. **Convergence speed of alternating:** cycling is **slower per step** (Phase-B steps advance the objective
+   little) — ~2.5× slower on knowledge, with no upside. Its only benefit is **regularisation**: on
+   overfitting-prone persona data it resists the late upward drift that joint/backbone show, so it reaches a
+   *better final* at large budgets (crossover ~2000–2500 steps). Alternating trades speed for robustness.

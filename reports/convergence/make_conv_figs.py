@@ -198,6 +198,24 @@ def heatmap_fig(sw):
     print("wrote cycle_sweep_2d.png")
 
 
+def trajectory_panel(ax, block):
+    """Held-out metric vs cumulative steps: joint SFT vs backbone-only vs cycling-EM."""
+    j = block["joint"]; b = block["backbone"]; cy = block["cycling"]
+    ax.plot(*zip(*[(s, m) for s, m in j]), "-o", ms=3, lw=1.8, color="#2a6fdb", label="joint SFT (no cycling)")
+    ax.plot(*zip(*[(s, m) for s, m in b]), "-o", ms=3, lw=1.8, color="#8c8c8c", label="EM Phase-A only (continuous backbone)")
+    cx = [s for s, m, p in cy]; cyy = [m for s, m, p in cy]
+    ax.plot(cx, cyy, "-", lw=1.6, color="#7b52ab", label="cycling-EM (alternate A/B)", zorder=3)
+    for s, m, p in cy:                                     # mark A-phase ends (green) vs B-phase ends (orange)
+        ax.plot(s, m, "o", ms=5, color=(A_COL if p == "A" else B_COL), zorder=4)
+    ax.plot([], [], "o", ms=6, color=A_COL, label="  ↳ after a Phase-A (backbone) step")
+    ax.plot([], [], "o", ms=6, color=B_COL, label="  ↳ after a Phase-B (token-only) step")
+    ax.set_xlabel("cumulative training steps")
+    ax.set_ylabel(block["metric"])
+    arrow = "↑ better" if block["better"] == "up" else "↓ better"
+    ax.set_title(f"{block['label']}\ndoes alternating cycle faster or slower? ({arrow})")
+    ax.legend(frameon=False, fontsize=7.5, loc="best")
+
+
 def _grid(blocks, panel, fname, figh=4.4):
     fig, ax = plt.subplots(1, len(blocks), figsize=(6.4 * len(blocks), figh), squeeze=False)
     for i, (_, b) in enumerate(blocks):
@@ -211,6 +229,9 @@ def main():
     schematic_fig()                                        # conceptual (no data needed)
     if data.get("sweep2d"):
         heatmap_fig(data["sweep2d"])
+    if data.get("trajectory"):
+        tb = [(k, data["trajectory"][k]) for k in ("knowledge", "persona") if data["trajectory"].get(k)]
+        _grid(tb, trajectory_panel, "cycle_trajectory.png", figh=4.6)
     blocks = [(k, data[k]) for k in ("knowledge", "persona") if data.get(k)]
     _grid(blocks, curves_panel, "convergence_curves.png")
     _grid(blocks, split_panel, "split_sweep.png")
