@@ -91,6 +91,38 @@ def ratios_panel(ax, block):
               frameon=False, fontsize=7.5, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=2)
 
 
+def overfitting_fig(block):
+    """Dual-axis: training loss ↓ vs held-out ppl ↑ — makes the small-set overfitting explicit."""
+    fig, ax1 = plt.subplots(figsize=(7.2, 4.6))
+    ax2 = ax1.twinx()
+    for name, tl in block["train_loss"].items():
+        xs, ys = zip(*tl)
+        ax1.plot(xs, ys, "-", lw=1.8, color=COL.get(name), label=f"{name} — train loss")
+    best_step = None
+    for name, pp in block["curves"].items():
+        if name not in block["train_loss"]:
+            continue
+        xs, ys = zip(*pp)
+        ax2.plot(xs, ys, "--o", ms=4, lw=1.6, color=COL.get(name), label=f"{name} — held-out ppl")
+        mi = min(range(len(ys)), key=lambda i: ys[i])
+        if best_step is None or xs[mi] < best_step:
+            best_step = xs[mi]
+    ax2.axvspan(best_step, max(xs), color="#c0504d", alpha=0.06)
+    ax2.axvline(best_step, color="#c0504d", lw=0.9, ls=":")
+    ax2.text(best_step + 60, ax2.get_ylim()[1] * 0.60, f"early-stop ~{best_step}  →  overfitting region",
+             color="#c0504d", fontsize=8, va="center")
+    ax1.set_xlabel("training steps")
+    ax1.set_ylabel("training loss  (↓, solid)")
+    ax2.set_ylabel("held-out MACRO ppl  (↓, dashed)")
+    ax1.set_title(f"{block['label']} — train loss ↓ while held-out ppl ↑\n"
+                  "textbook overfitting of a tiny style set (912 ex, 3B): early-stopping essential")
+    h1, l1 = ax1.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
+    ax1.legend(h1 + h2, l1 + l2, frameon=False, fontsize=7.5, loc="upper center",
+               bbox_to_anchor=(0.5, -0.14), ncol=2)
+    fig.tight_layout(); fig.savefig(FIGS / "persona_overfitting.png", dpi=140, bbox_inches="tight"); plt.close(fig)
+    print("wrote persona_overfitting.png")
+
+
 def _grid(blocks, panel, fname, figh=4.4):
     fig, ax = plt.subplots(1, len(blocks), figsize=(6.4 * len(blocks), figh), squeeze=False)
     for i, (_, b) in enumerate(blocks):
@@ -105,6 +137,9 @@ def main():
     _grid(blocks, curves_panel, "convergence_curves.png")
     _grid(blocks, split_panel, "split_sweep.png")
     _grid(blocks, ratios_panel, "split_ratios.png")
+    for _, b in blocks:
+        if b.get("train_loss"):
+            overfitting_fig(b)
 
 
 if __name__ == "__main__":

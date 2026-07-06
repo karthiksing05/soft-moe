@@ -35,10 +35,21 @@ distinct init so the backbone can route on them). Reproduce: `conv.sbatch` (sing
   the tokens at a distinct init gives the backbone fixed anchors to route on, so it doesn't have to
   co-adapt to moving token embeddings — a cleaner optimisation.
 
-**Persona** — held-out ppl vs steps (lower better). All three arms **bottom out around ~500 steps then
-overfit** (912-example style set, 3B model): generic 4.86→27.3, joint token 4.37→18.5, EM Phase-A
-4.40→9.0. Early stopping matters far more than which method here; the best ppl (~4.37, joint SFT @500) is
-reached quickly by every arm.
+**Persona** — held-out ppl vs steps (lower better). Here every arm **converges within ~250–500 steps then
+*overfits*** (generic 4.86→27.3, joint token 4.37→18.5, EM Phase-A 4.40→9.0 by 3000 steps). This is not a
+bug — it is textbook overfitting of a tiny style set (912 examples, ~114/persona) by a 3B model, confirmed
+by the training loss: it marches to ~0 (generic 2.54→0.16, joint token 2.64→**0.08**) *while* held-out ppl
+climbs. The model memorises the training responses and loses generalisation to the held-out questions
+(overfit ppl even exceeds the base model's, because an over-confident low-entropy model assigns very low
+probability to the unseen true continuations).
+
+![persona overfitting](persona_overfitting.png)
+
+The practical reading: on a small style set, **which method barely matters — early stopping does**. The
+best ppl (~4.37) is reached by ~500 steps by every arm; training longer only hurts. (Knowledge, by
+contrast, has enough data and a small enough model that it converges *monotonically* with no overfitting
+over the same 3000 steps.) This overfitting is also exactly why the persona split sweep below prefers a
+Phase-B-heavy allocation — see §2.
 
 ## 2. Phase A/B split — and why the best split *inverts* between tasks
 
