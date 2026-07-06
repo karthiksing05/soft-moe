@@ -1,0 +1,17 @@
+{
+  "knowledge": {
+    "label": "Conflicting knowledge (counterfact, 0.5B)",
+    "metric": "exact-match accuracy (%)",
+    "better": "up",
+    "ceiling": 50,
+    "ceiling_label": "coin-flip ceiling (generic token)",
+    "curves": {
+      "generic SFT":            [[250, 24.9], [500, 31.9], [1000, 42.5], [2000, 48.7], [3000, 49.9]],
+      "expert-token joint SFT": [[250, 34.6], [500, 51.0], [1000, 81.6], [2000, 97.9], [3000, 99.7]],
+      "EM Phase-A (backbone)":  [[500, 49.0], [1000, 85.8], [1500, 96.6], [1750, 97.3], [2000, 98.5]]
+    },
+    "split_total": 2000,
+    "split": [[0, 98.5], [250, 97.4], [500, 96.7], [1000, 88.8], [1500, 53.1]]
+  },
+  "persona": null
+}
