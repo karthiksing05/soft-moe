@@ -29,14 +29,14 @@ def _best_idx(ys, better):
 
 def curves_panel(ax, block):
     ymax = block.get("ymax")
-    for name, pts in block["curves"].items():
+    for ci, (name, pts) in enumerate(block["curves"].items()):
         xs, ys = zip(*pts)
         ax.plot(xs, ys, "-o", ms=4, lw=1.8, color=COL.get(name, None), label=name)
         if ymax is not None:                               # flag points that overfit off the top of the axis
             for x, y in pts:
                 if y > ymax:
-                    ax.annotate(f"{y:.1f}↑", (x, ymax), color=COL.get(name), fontsize=7,
-                                ha="center", va="top")
+                    ax.annotate(f"{y:.0f}↑", (x, ymax), color=COL.get(name), fontsize=7,
+                                ha="right", va="top", xytext=(-3, -3 - 11 * ci), textcoords="offset points")
     if ymax is not None:
         ax.set_ylim(top=ymax)
     if block.get("ceiling") is not None:
