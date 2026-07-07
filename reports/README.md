@@ -14,6 +14,10 @@ helps** — versus naive joint finetuning, a generic-token baseline, and a real 
 > for quality/regularisation and for the scarce-data tail — but on balanced, ample data a per-expert token
 > trained by plain SFT already captures most of the benefit.
 
+📋 **Apparatus** — models, datasets, hyperparameters, data formats and real data examples (incl. the
+*conflicting vs. expected knowledge* distinction) are documented in
+**[EXPERIMENTAL_SETUP.md](EXPERIMENTAL_SETUP.md)**.
+
 This directory has three bodies of work:
 
 | directory | what | scale |
@@ -184,6 +188,7 @@ reproduces. Remaining gaps: Phase-B **noise injection** and **phase-ordering** (
 ```
 reports/
   README.md                     ← this consolidated report
+  EXPERIMENTAL_SETUP.md         ← models, datasets, hyperparameters, data formats + examples
   em-expert-tokens/             ← Qwen mechanism / robustness / fidelity study
     README.md                     setup + local index
     PERSONA_RESULTS.md            §1 persona (hidden identity)
