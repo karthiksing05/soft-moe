@@ -51,9 +51,11 @@ the thesis's primary experiment.
 
 ## Gaps & divergences — where we are *not* faithful
 
-1. **Persona-collapse metric is missing.** The thesis's *second primary metric* is within-/between-cluster variance
-   of the embeddings. We never compute it. Our **swap-test** (route through the wrong token → ppl increase) is a
-   *related* causal proxy (collapse ⇒ swap-ratio ≈ 1), but it is not the same measurement. **Gap.**
+1. ~~**Persona-collapse metric is missing.**~~ **NOW IMPLEMENTED** ([COLLAPSE_RESULTS.md](COLLAPSE_RESULTS.md),
+   `collapse_metric.py`): geometric spread of the learned embeddings (mean pairwise cosine, effective rank, L2).
+   Result is thesis-supporting — EM embeddings are far less collapsed than joint SFT's (cosine 0.23 → 0.06, L2
+   0.8 → 9.8), monotonic in Phase-B budget. (One embedding per persona makes the thesis's exact within/between
+   variance ratio degenerate, so these are the standard equivalents.)
 2. **No noise injection in Phase B.** The thesis explicitly adds noise during embedding updates to prevent collapse
    (Xie et al. 2020). We only do a *one-time distinct init* of the expert rows ([train_sft.py:55-58](train_sft.py#L55));
    there is no per-step noise. **Divergence.**
