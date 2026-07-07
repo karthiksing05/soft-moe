@@ -1,0 +1,22 @@
+{
+  "personas_A": ["pirate", "bard", "professor", "teen"],
+  "personas_B": ["detective", "child", "coach", "robot"],
+  "joint_ref": {"A": 3.645, "B": 4.212},
+  "methods": [
+    {"key": "fullft", "label": "sequential full-FT\n(1000 backbone steps on B)", "color": "#c0504d"},
+    {"key": "em_cyc", "label": "EM-cycling on B\n(500 backbone + 500 token)", "color": "#7b52ab"},
+    {"key": "em",     "label": "EM token-only on B\n(0 backbone, frozen)", "color": "#2a6fdb"}
+  ],
+  "fullft": {
+    "afterA": {"pirate": 3.679, "bard": 3.624, "professor": 3.062, "teen": 4.549, "detective": 14.219, "child": 24.636, "coach": 6.819, "robot": 34.572},
+    "afterB": {"pirate": 4.989, "bard": 4.699, "professor": 3.944, "teen": 6.583, "detective": 4.318, "child": 4.015, "coach": 3.515, "robot": 6.831}
+  },
+  "em_cyc": {
+    "afterA": {"pirate": 3.659, "bard": 3.608, "professor": 3.056, "teen": 4.786, "detective": 14.006, "child": 21.043, "coach": 7.668, "robot": 19.268},
+    "afterB": {"pirate": 4.871, "bard": 4.725, "professor": 5.117, "teen": 6.004, "detective": 4.162, "child": 3.716, "coach": 3.468, "robot": 5.906}
+  },
+  "em": {
+    "afterA": {"pirate": 3.659, "bard": 3.608, "professor": 3.056, "teen": 4.786, "detective": 14.006, "child": 21.043, "coach": 7.668, "robot": 19.268},
+    "afterB": {"pirate": 3.749, "bard": 3.659, "professor": 3.165, "teen": 5.193, "detective": 5.880, "child": 4.902, "coach": 4.294, "robot": 6.928}
+  }
+}
