@@ -57,7 +57,7 @@ the thesis's primary experiment.
    0.8 → 9.8), monotonic in Phase-B budget. (One embedding per persona makes the thesis's exact within/between
    variance ratio degenerate, so these are the standard equivalents.)
 2. **No noise injection in Phase B.** The thesis explicitly adds noise during embedding updates to prevent collapse
-   (Xie et al. 2020). We only do a *one-time distinct init* of the expert rows ([train_sft.py:55-58](train_sft.py#L55));
+   (Xie et al. 2020). We only do a *one-time distinct init* of the expert rows ([train_sft.py:55-58](repro/train_sft.py#L55));
    there is no per-step noise. **Divergence.**
 3. ~~**Scarce-data / cold-start regime untested — the big one.**~~ **NOW TESTED — and the thesis claim
    reproduces.** See [COLDSTART_RESULTS.md](COLDSTART_RESULTS.md): with imbalanced train volumes (450 → 4

@@ -5,8 +5,8 @@ should a fixed step budget be split (and cycled) between **Phase A** (train the 
 frozen) and **Phase B** (train only the K expert-token embeddings, backbone frozen)? Two tasks, **one
 unified metric (held-out MACRO perplexity ↓)**:
 
-- **Conflicting knowledge** ([counterfact](../qwen_poc/KNOWLEDGE_RESULTS.md), Qwen2.5-0.5B)
-- **Persona / style** ([persona](../qwen_poc/PERSONA_RESULTS.md), Qwen2.5-3B, a **3.6k-example** set)
+- **Conflicting knowledge** ([counterfact](../em-expert-tokens/KNOWLEDGE_RESULTS.md), Qwen2.5-0.5B)
+- **Persona / style** ([persona](../em-expert-tokens/PERSONA_RESULTS.md), Qwen2.5-3B, a **3.6k-example** set)
 
 Three arms: **generic SFT** (plain finetuning, generic assistant token), **expert-token joint SFT** (the
 token, trained in one joint pass), and **EM Phase-A** (the decoupled backbone phase, tokens frozen at a

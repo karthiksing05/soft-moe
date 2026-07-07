@@ -17,7 +17,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = Path(__file__).resolve().parent
-DATA = HERE / "figs" / "cf.json"
+DATA = HERE.parent / "figs" / "cf.json"
 BEFORE, AFTER = "#5aa469", "#c0504d"
 
 
@@ -62,7 +62,7 @@ def main():
     ax[1].set_title("Task B learned (after learning B)\n(did the method still acquire the new task?)")
     fig.suptitle("Catastrophic forgetting: sequential full-FT vs EM (cycling / token-only) on Task B",
                  y=1.02, fontsize=12, fontweight="bold")
-    fig.tight_layout(); fig.savefig(HERE / "figs" / "catastrophic_forgetting.png", dpi=140, bbox_inches="tight")
+    fig.tight_layout(); fig.savefig(HERE.parent / "figs" / "catastrophic_forgetting.png", dpi=140, bbox_inches="tight")
     plt.close(fig)
     for m, b, a2, bb in zip(methods, aA, aB, bB):
         print(f"{m['key']:10} A-forget +{100*(a2-b)/b:5.0f}%   B-learned {bb:.2f}")

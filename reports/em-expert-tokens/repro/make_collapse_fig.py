@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = Path(__file__).resolve().parent
-d = json.loads((HERE / "figs" / "collapse.json").read_text())
+d = json.loads((HERE.parent / "figs" / "collapse.json").read_text())
 runs = d["runs"]; x = np.arange(len(runs))
 COLS = ["#8c8c8c", "#2a6fdb", "#5aa469"]
 
@@ -29,5 +29,5 @@ for xi, v in zip(x, d["mean_l2"]):
     ax[1].annotate(f"{v:.2f}", (xi, v), textcoords="offset points", xytext=(0, 3), ha="center", fontweight="bold")
 fig.suptitle("Persona-embedding collapse metric — EM keeps embeddings far more distinct than joint SFT",
              y=1.03, fontsize=12, fontweight="bold")
-fig.tight_layout(); fig.savefig(HERE / "figs" / "collapse.png", dpi=140, bbox_inches="tight")
+fig.tight_layout(); fig.savefig(HERE.parent / "figs" / "collapse.png", dpi=140, bbox_inches="tight")
 print("wrote collapse.png")

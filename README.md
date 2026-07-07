@@ -11,6 +11,10 @@ alternatives:
 The goal is a setting where the MoE's capacity is *necessary*, and a clean read on what the EM
 method buys instead: near-free **specialization** on a fixed backbone.
 
+> **📊 For the full consolidated story** — the capacity comparison below *plus* the larger Qwen study
+> (persona, knowledge, cold-start, collapse, catastrophic forgetting, convergence, thesis fidelity) and a
+> synthesis of **all the advantages of EM training** — see **[`reports/README.md`](reports/README.md)**.
+
 ## The experiment (`configs/experiment/*_d256.yaml`)
 
 A **capacity-constrained** byte-level backbone (d=256, 6 layers) on **`demix8`** — 8 distinct

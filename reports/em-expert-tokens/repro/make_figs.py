@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = Path(__file__).resolve().parent
-FIGS = HERE / "figs"
+FIGS = HERE.parent / "figs"
 DATA = FIGS / "results.json"
 
 CTL, EM = "#8c8c8c", "#2a6fdb"     # control grey, EM blue
