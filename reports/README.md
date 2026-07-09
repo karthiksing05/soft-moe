@@ -14,6 +14,8 @@ helps** — versus naive joint finetuning, a generic-token baseline, and a real 
 > for quality/regularisation and for the scarce-data tail — but on balanced, ample data a per-expert token
 > trained by plain SFT already captures most of the benefit.
 
+🖼️ **In a hurry?** [SUMMARY.md](SUMMARY.md) shows every core result as one line + its graphic.
+
 📋 **Apparatus** — models, datasets, hyperparameters, data formats and real data examples (incl. the
 *conflicting vs. expected knowledge* distinction) are documented in
 **[EXPERIMENTAL_SETUP.md](EXPERIMENTAL_SETUP.md)**.
