@@ -49,6 +49,7 @@ The expert token pays off **exactly when the identity/source is (a) not recovera
 | [CATASTROPHIC_FORGETTING.md](CATASTROPHIC_FORGETTING.md) | does EM forget less when learning a new task? | freezing backbone (token-only) → **+4% vs +35% forgetting**; cycling learns new task best but forgets |
 | [EM_VS_SFT.md](EM_VS_SFT.md) | *when* does EM two-phase beat joint SFT? (many personas × few episodes) | EM advantage **grows as episodes/persona shrink** (+7% @ n=15, +19% @ n=5); learned > frozen only at low data |
 | [LINEAR_SEPARABILITY.md](LINEAR_SEPARABILITY.md) | is the token-induced persona space linearly separable? | **100% held-out linear-probe** (chance 12.5%) in every scheme — the token builds it, the alternation doesn't sharpen it |
+| [INCREMENTAL.md](INCREMENTAL.md) | how cheaply can a *new* persona be added? | fit **only its token** (~2K params, backbone frozen): **22.7 → 6.5 ppl in ~30–100 steps** from ~25 ex, base personas retained (full-FT forgets: 3.8 → 9.6) |
 | [../convergence/CONVERGENCE_RESULTS.md](../convergence/CONVERGENCE_RESULTS.md) | convergence, Phase-A/B split, cycling | expert token helps at every step; all-Phase-A best; cycling trades speed for robustness |
 | [THESIS_FIDELITY.md](THESIS_FIDELITY.md) | are we faithful to the thesis? | core method + both primary metrics faithful; noise-injection & phase-ordering still open |
 

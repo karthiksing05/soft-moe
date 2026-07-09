@@ -57,14 +57,21 @@ Persona train volumes **450 → 4** examples, balanced test: EM **crushes joint 
 
 ![coldstart](em-expert-tokens/figs/coldstart.png)
 
-### 4. Embedding collapse (thesis's 2nd metric)
+### 4. Adding a new persona is cheap (incremental training)
+Given a backbone trained on 7 personas, add the 8th by fitting **only its token** (~one embedding, backbone
+frozen): new-persona ppl **22.7 → 6.5 in ~30–100 steps** from ~25 examples, with the **base personas retained**
+— while full fine-tuning forgets them (base 3.8 → 9.6) and overfits. *([INCREMENTAL](em-expert-tokens/INCREMENTAL.md))*
+
+![incremental](em-expert-tokens/figs/incremental.png)
+
+### 5. Embedding collapse (thesis's 2nd metric)
 Geometry of the learned tokens: EM keeps them **~10× more separated** than joint SFT (mean cosine
 **0.23 → 0.06**), monotonic in Phase-B budget — resisting the collapse the thesis warns about.
 *([COLLAPSE_RESULTS](em-expert-tokens/COLLAPSE_RESULTS.md))*
 
 ![collapse](em-expert-tokens/figs/collapse.png)
 
-### 5. The token creates a linearly separable persona space (alternation vs frozen vs SFT)
+### 6. The token creates a linearly separable persona space (alternation vs frozen vs SFT)
 Token-induced representation shift Δ = h(persona token) − h(generic marker): a held-out linear probe recovers
 which of 8 personas at **100%** (vs 12.5% chance) — 8 clean clusters — in **every** scheme. The *token*, not
 the alternation, builds the separable space (frozen ≈ SFT ≥ EM by margin on balanced data).
@@ -72,7 +79,7 @@ the alternation, builds the separable space (frozen ≈ SFT ≥ EM by margin on 
 
 ![separability](em-expert-tokens/figs/separability.png)
 
-### 6. Does alternating cycle *faster or slower*?
+### 7. Does alternating cycle *faster or slower*?
 Trajectory of joint SFT vs continuous backbone vs cycling-EM: cycling is **slower per step** (Phase-B steps
 are ~flat) with no upside on knowledge, but **resists late overfitting** on persona.
 *([CONVERGENCE_RESULTS §5](convergence/CONVERGENCE_RESULTS.md#5-does-alternating-converge-faster-or-slower-trajectory))*
