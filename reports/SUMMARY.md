@@ -64,7 +64,15 @@ Geometry of the learned tokens: EM keeps them **~10× more separated** than join
 
 ![collapse](em-expert-tokens/figs/collapse.png)
 
-### 5. Does alternating cycle *faster or slower*?
+### 5. The token creates a linearly separable persona space (alternation vs frozen vs SFT)
+Token-induced representation shift Δ = h(persona token) − h(generic marker): a held-out linear probe recovers
+which of 8 personas at **100%** (vs 12.5% chance) — 8 clean clusters — in **every** scheme. The *token*, not
+the alternation, builds the separable space (frozen ≈ SFT ≥ EM by margin on balanced data).
+*([LINEAR_SEPARABILITY](em-expert-tokens/LINEAR_SEPARABILITY.md))*
+
+![separability](em-expert-tokens/figs/separability.png)
+
+### 6. Does alternating cycle *faster or slower*?
 Trajectory of joint SFT vs continuous backbone vs cycling-EM: cycling is **slower per step** (Phase-B steps
 are ~flat) with no upside on knowledge, but **resists late overfitting** on persona.
 *([CONVERGENCE_RESULTS §5](convergence/CONVERGENCE_RESULTS.md#5-does-alternating-converge-faster-or-slower-trajectory))*
