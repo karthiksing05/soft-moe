@@ -27,6 +27,7 @@ This directory has three bodies of work:
 | [`comparison/`](comparison/) | the original **capacity** headline: EM-token vs real MoE vs full-FT | byte-level d=256, 8 domains |
 | [`em-expert-tokens/`](em-expert-tokens/) | the **mechanism, robustness & fidelity** study (persona, knowledge, cold-start, collapse, forgetting) | Qwen2.5-0.5B / 3B |
 | [`convergence/`](convergence/) | **training dynamics** (convergence speed, Phase-A/B split, cycling) | Qwen2.5-0.5B / 3B |
+| [`persona-vectors/`](persona-vectors/) | **geometry of the learned vectors** (where they sit in token space; composing them) | Qwen2.5-3B |
 
 ---
 
@@ -211,6 +212,7 @@ reports/
     figs/                         all figures + their JSON data
     repro/                        all training / eval / figure / data scripts + sbatch
   convergence/                  ← §3 training dynamics (curves, split, cycling)
+  persona-vectors/              ← geometry: expert vectors in token space + composing them
   comparison/                   ← §5 d256 EM-vs-MoE-vs-full-FT capacity headline + mech-interp
 ```
 

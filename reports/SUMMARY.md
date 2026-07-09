@@ -93,3 +93,5 @@ are ~flat) with no upside on knowledge, but **resists late overfitting** on pers
 - **2D sweep** (accuracy ≈ f(total compute)): [convergence/cycle_sweep_2d.png](convergence/cycle_sweep_2d.png)
 - **EM cycling schematic**: [convergence/em_cycling_schematic.png](convergence/em_cycling_schematic.png)
 - **EM vs a real MoE (mech-interp)** — near-free specialization at d256: [comparison/mech_interp/3_latent_separation.png](comparison/mech_interp/3_latent_separation.png), [1_activation_shift.png](comparison/mech_interp/1_activation_shift.png), [2_gate_signatures.png](comparison/mech_interp/2_gate_signatures.png) *([mech-interp report](comparison/mech_interp/report.md))*
+- **Persona vectors in token space** — learned vectors are extreme-norm outliers, far from any word: [persona-vectors/figs/token_space.png](persona-vectors/figs/token_space.png) *([persona-vectors](persona-vectors/README.md))*
+- **Composing persona vectors** — persona tokens blend (with a threshold), domain tokens compose to nothing: [persona-vectors/figs/composition.png](persona-vectors/figs/composition.png) *([persona-vectors](persona-vectors/README.md))*
