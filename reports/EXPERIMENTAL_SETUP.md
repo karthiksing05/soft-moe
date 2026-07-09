@@ -238,6 +238,7 @@ question, so the domain is recoverable):
 | `gen_synth_knowledge.py` | synthetic fictional-knowledge data |
 | `make_imbalanced.py` | cold-start imbalanced-volume set |
 | `make_task_split.py` | task A/B split for forgetting |
+| `gen_persona_pool.py` + `make_pool_cell.py` | 64-persona pool + (K×n) cells for the many-personas/few-episodes study |
 | `train_sft.py` | the trainer (all `--variant`/`--phase` combinations) |
 | `eval_poc.py` / `eval_knowledge.py` | held-out ppl + swap / exact-match accuracy + swap |
 | `collapse_metric.py` | embedding-collapse metric |

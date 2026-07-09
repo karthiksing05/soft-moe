@@ -1,0 +1,9 @@
+{
+  "model": "Qwen2.5-3B", "K": 64,
+  "n": [5, 15, 40],
+  "joint":  [730.7, 22.12, 6.49],
+  "frozen": [672.4, 22.92, 6.55],
+  "em":     [589.3, 20.49, 6.68],
+  "swap_em": [1.11, 1.14, 1.18],
+  "note_05b": "A 0.5B sweep (K in {16,32,64}, n=15) was inconclusive: swap-ratio ~1.0 in every cell (no method reached persona-conditioning), so it cannot answer the question. This 3B run does."
+}

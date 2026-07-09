@@ -73,6 +73,12 @@ Separating "the token" from "the EM ceremony":
   joint SFT by **+8.8%** ppl, and produces a better backbone (though a *less* load-bearing token). ([PERSONA_RESULTS](em-expert-tokens/PERSONA_RESULTS.md))
 - **The decisive EM win is data-dependent** (§4): on scarce/imbalanced data the two phases matter a lot; on
   balanced ample data they mostly don't.
+- **Directly confirmed** ([EM_VS_SFT.md](em-expert-tokens/EM_VS_SFT.md)): with **many personas (K=64) and few
+  episodes each**, EM two-phase's advantage over joint SFT **grows as episodes-per-persona shrink** — tied at
+  n=40, **+7% at n=15, +19% at n=5** — and at low data the *learned* token beats a *frozen-random* one by
+  +10–12% (whereas on ample data they tie). So the earlier "frozen-random works just as well" observation is a
+  balanced-data artifact: **learning the embedding, and the two-phase scheme, earn their keep precisely in the
+  data-starved-per-expert long tail** the thesis targets.
 
 ## 3. Training dynamics — convergence, budget split, cycling
 
@@ -195,6 +201,7 @@ reports/
     DOMAIN_RESULTS.md             §1 domain-QA (recoverable, null)
     KNOWLEDGE_RESULTS.md          §1 novel knowledge (recoverable vs conflicting)
     RESULTS.md                    §1 appendix: domain-count sweep + metric post-mortem
+    EM_VS_SFT.md                  §2 many-personas × few-episodes: where EM beats joint SFT
     COLDSTART_RESULTS.md          §4a imbalanced / cold-start
     COLLAPSE_RESULTS.md           §4b embedding collapse metric
     CATASTROPHIC_FORGETTING.md    §4c continual learning

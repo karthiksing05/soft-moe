@@ -47,6 +47,7 @@ The expert token pays off **exactly when the identity/source is (a) not recovera
 | [COLDSTART_RESULTS.md](COLDSTART_RESULTS.md) | does EM help the low-data tail? (thesis's core claim) | **EM ≫ joint under imbalance** (−38% ppl); 4-example persona rescued 43→8.5 |
 | [COLLAPSE_RESULTS.md](COLLAPSE_RESULTS.md) | thesis metric #2 — do embeddings collapse? | EM embeddings **far more distinct** (cos 0.23→0.06, L2 ~10×) |
 | [CATASTROPHIC_FORGETTING.md](CATASTROPHIC_FORGETTING.md) | does EM forget less when learning a new task? | freezing backbone (token-only) → **+4% vs +35% forgetting**; cycling learns new task best but forgets |
+| [EM_VS_SFT.md](EM_VS_SFT.md) | *when* does EM two-phase beat joint SFT? (many personas × few episodes) | EM advantage **grows as episodes/persona shrink** (+7% @ n=15, +19% @ n=5); learned > frozen only at low data |
 | [../convergence/CONVERGENCE_RESULTS.md](../convergence/CONVERGENCE_RESULTS.md) | convergence, Phase-A/B split, cycling | expert token helps at every step; all-Phase-A best; cycling trades speed for robustness |
 | [THESIS_FIDELITY.md](THESIS_FIDELITY.md) | are we faithful to the thesis? | core method + both primary metrics faithful; noise-injection & phase-ordering still open |
 
