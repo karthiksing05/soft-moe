@@ -25,13 +25,18 @@ echo "=== split: base = personas 0-6, new = persona 7 (robot) ==="
 python qwen_poc/make_task_split.py --data $D --group-a 0,1,2,3,4,5,6 --out-a $BASE --out-b $NEW
 echo "=== base backbone (Phase A on 7 base personas) ==="
 $TRB --data $BASE --variant em --phase backbone --lr 1e-5 --steps 1000 --out $O/base_bb
-echo "-- BASE_BB (token 7 untrained)"; EV $O/base_bb
-echo "=== INCREMENTAL: token-only fit of the new persona's token (backbone frozen) ==="
+echo "-- BASE_BB (step 0)"; EV $O/base_bb
+echo "=== ARM 1: token-only (Phase B, backbone frozen) ==="
 $TRB --data $NEW --variant em --phase tokens --lr 1e-2 --init-from $O/base_bb --steps 300 --save-steps 10,30,100 --out $O/tok
 for s in 10 30 100; do echo "-- TOK s$s"; EV $O/tok__s$s; done; echo "-- TOK s300"; EV $O/tok
-echo "=== INCREMENTAL: full fine-tune (backbone + token) for contrast ==="
+echo "=== ARM 2: full SFT (Phase full, backbone + token) ==="
 $TRB --data $NEW --variant em --phase full --lr 1e-5 --init-from $O/base_bb --steps 300 --save-steps 10,30,100 --out $O/full
 for s in 10 30 100; do echo "-- FULL s$s"; EV $O/full__s$s; done; echo "-- FULL s300"; EV $O/full
+echo "=== ARM 3: EM two-phase (Phase A backbone 150 -> Phase B tokens 150) ==="
+$TRB --data $NEW --variant em --phase backbone --lr 1e-5 --init-from $O/base_bb --steps 150 --save-steps 30,100 --out $O/emA
+for s in 30 100; do echo "-- EMA s$s"; EV $O/emA__s$s; done; echo "-- EMA s150"; EV $O/emA
+$TRB --data $NEW --variant em --phase tokens --lr 1e-2 --init-from $O/emA --steps 150 --save-steps 30,100 --out $O/emB
+for s in 30 100; do echo "-- EMB s$s"; EV $O/emB__s$s; done; echo "-- EMB s150"; EV $O/emB
 echo "=== data-efficiency: token-only, 100 steps, n new examples ==="
 for n in 5 25 100; do
   Nn=$O/new_n$n; mkdir -p $Nn; cp $NEW/experts.json $NEW/control.test.jsonl $NEW/em.test.jsonl $Nn/
