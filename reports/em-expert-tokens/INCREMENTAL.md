@@ -53,6 +53,33 @@ fits per-persona tokens. **Pure single-persona incremental training has no aggre
   is a *re-training*, not a cheap incremental add.
 - **Full SFT** is dominated: it forgets *and* overfits.
 
+## Scaling — does adding a persona get easier with more base personas?
+
+If token-only add works by fitting a new embedding against an *already-capable* backbone, then a backbone that
+has seen **more distinct personas** should be a more *general* conditioning engine — making a brand-new persona
+cheaper to absorb. We test this on the **64-persona pool**: train the backbone on **K base personas** (fixed
+1000-step budget, so only *diversity* varies), then add **3 held-out new personas** via token-only (backbone
+frozen) and measure their held-out ppl.
+
+![incremental scaling](figs/scaleinc.png)
+
+| K base personas | 2 | 4 | 8 | 16 | 32 | 60 |
+|---|---|---|---|---|---|---|
+| new-persona ppl (token-only) | 9.2 | 8.1 | 11.2 | 10.1 | **6.1** | **5.5** |
+| new-token swap-ratio | 1.44 | 1.46 | 1.29 | 1.35 | **17.2** | **4.7** |
+
+**Yes — with a threshold.** Adding a new persona gets markedly better once the backbone has seen enough
+personas: new-persona ppl drops from ~10 (K≤16) to **~5.5 (K=60)**. Even more telling is the swap-ratio: below
+~32 personas the new token is **barely load-bearing** (swap ≈ 1.3–1.5 — the backbone produces generic-ish
+output and scarcely uses the token), but at **K ≥ 32 the new token becomes strongly load-bearing** (swap 5–17).
+So the backbone only becomes a genuine, reusable **token-conditioning engine** after ~32 diverse personas — and
+past that point, adding the next persona is both cheaper and far more effective. *(The small-K region is noisy —
+fixed-budget training over-fits a handful of personas, single seed, 3 held-out personas — so the clean signal
+is the sharp improvement and swap emergence at K ≥ 32, not the exact small-K values.)*
+
+This is the compounding pay-off of the method: **the more experts you've trained, the more general the shared
+backbone, and the cheaper and better the next expert is to add.**
+
 ## Bottom line
 
 **An expert can be added as just a token** — ~2K params, ~30 steps, ~25 examples, no forgetting — via

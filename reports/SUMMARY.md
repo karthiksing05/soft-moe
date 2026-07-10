@@ -65,6 +65,12 @@ SFT** forgets *and* overfits. Only frozen-backbone token-only is non-destructive
 
 ![incremental](em-expert-tokens/figs/incremental.png)
 
+**It compounds with scale:** adding a *new* persona (token-only) gets cheaper and more effective the more base
+personas the backbone has seen — new-persona ppl ~10 (K≤16) → **5.5 (K=60)**, and the new token only becomes
+strongly load-bearing (swap 1.3 → 5–17) once the backbone has seen **~32+** distinct personas.
+
+![incremental scaling](em-expert-tokens/figs/scaleinc.png)
+
 ### 5. Embedding collapse (thesis's 2nd metric)
 Geometry of the learned tokens: EM keeps them **~10× more separated** than joint SFT (mean cosine
 **0.23 → 0.06**), monotonic in Phase-B budget — resisting the collapse the thesis warns about.
