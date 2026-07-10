@@ -57,10 +57,11 @@ Persona train volumes **450 → 4** examples, balanced test: EM **crushes joint 
 
 ![coldstart](em-expert-tokens/figs/coldstart.png)
 
-### 4. Adding a new persona is cheap (incremental training)
-Given a backbone trained on 7 personas, add the 8th by fitting **only its token** (~one embedding, backbone
-frozen): new-persona ppl **22.7 → 6.5 in ~30–100 steps** from ~25 examples, with the **base personas retained**
-— while full fine-tuning forgets them (base 3.8 → 9.6) and overfits. *([INCREMENTAL](em-expert-tokens/INCREMENTAL.md))*
+### 4. Adding a new persona: token-only vs full SFT vs EM (incremental training)
+Add an 8th persona to a 7-persona backbone. **token-only** (fit ~one embedding, backbone frozen) adds it
+**25 → 6.3 ppl in ~30 steps** from ~25 examples with the **base personas retained (5.2)**; **EM** gives the
+best/most-stable new-persona quality (5.9, no overfit) but its Phase A **forgets the base (→ 9.5)**; **full
+SFT** forgets *and* overfits. Only frozen-backbone token-only is non-destructive. *([INCREMENTAL](em-expert-tokens/INCREMENTAL.md))*
 
 ![incremental](em-expert-tokens/figs/incremental.png)
 
