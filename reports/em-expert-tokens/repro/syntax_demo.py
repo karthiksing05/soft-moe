@@ -21,7 +21,9 @@ def main() -> int:
     ap.add_argument("--swap", action="store_true", help="em: route through the WRONG expert token")
     ap.add_argument("--max-eval", type=int, default=240)
     ap.add_argument("--show", type=int, default=4)
+    ap.add_argument("--only", default=None, help="comma-sep expert_ids to restrict eval to (e.g. base vs new persona)")
     a = ap.parse_args()
+    only = {int(x) for x in a.only.split(",")} if a.only else None
     from transformers import AutoModelForCausalLM, AutoTokenizer
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     dt = torch.bfloat16 if dev == "cuda" else torch.float32
@@ -32,7 +34,10 @@ def main() -> int:
     experts = json.loads((Path(a.data) / "experts.json").read_text()); names = experts["names"]; K = experts["n_experts"]
     exp_ids = [tok.convert_tokens_to_ids(t) for t in experts["expert_tokens"]]
     eos = list({tok.eos_token_id, tok.convert_tokens_to_ids("<|im_end|>")} - {None})
-    rows = [json.loads(l) for l in open(Path(a.data) / f"{a.variant}.test.jsonl")][: a.max_eval]
+    rows = [json.loads(l) for l in open(Path(a.data) / f"{a.variant}.test.jsonl")]
+    if only is not None:
+        rows = [r for r in rows if r["expert_id"] in only]
+    rows = rows[: a.max_eval]
 
     @torch.no_grad()
     def gen(prompts, swap_to=None):
