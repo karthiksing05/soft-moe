@@ -1,0 +1,22 @@
+{
+  "seeded": {
+    "token-only":      {"new": [30.0, 16.7, 21.7], "base": [85.2, 78.8, 82.1]},
+    "full-SFT":        {"new": [100, 100, 100],     "base": [15.2, 15.0, 14.3]},
+    "A-first EM":      {"new": [100, 100, 100],     "base": [15.5, 14.5, 15.2]},
+    "token-first EM":  {"new": [100, 100, 100],     "base": [76.2, 52.9, 47.6]},
+    "replay":          {"new": [78.3, 80.0, 88.3],  "base": [93.1, 85.5, 99.3]}
+  },
+  "seed_order": ["token-only", "full-SFT", "A-first EM", "token-first EM", "replay"],
+  "frontier": {
+    "a":    [10, 20, 40, 80, 150],
+    "base": [78.8, 74.8, 62.9, 63.3, 73.6],
+    "new":  [25.0, 58.3, 98.3, 100.0, 100.0]
+  },
+  "frontier_refs": {
+    "token-only": {"base": 64.3, "new": 13.3},
+    "A-first EM": {"base": 27.4, "new": 100.0},
+    "full-SFT":   {"base": 26.7, "new": 100.0},
+    "replay":     {"base": 84.8, "new": 95.0}
+  },
+  "granularity": {"N": [1, 2, 4, 8], "base": [44.8, 61.4, 46.7, 20.2], "new": [98.3, 100.0, 93.3, 100.0]}
+}

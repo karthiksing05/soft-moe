@@ -1,0 +1,154 @@
+=== data (K=8) + split base 0-6 / new 7 (len_prefix) + base+new mix for replay ===
+K=8 transforms, 350 train / 60 test sentences
+example base: 'the mirror watched the teacher'
+  prefix_zk     -> zkthe zkmirror zkwatched zkthe zkteacher
+  suffix_um     -> theum mirrorum watchedum theum teacherum
+  reverse       -> eht rorrim dehctaw eht rehcaet
+  double_first  -> tthe mmirror wwatched tthe tteacher
+  vowels_zero   -> th0 m0rr0r w0tch0d th0 t00ch0r
+  bracket       -> [the] [mirror] [watched] [the] [teacher]
+  caps_bang     -> THE! MIRROR! WATCHED! THE! TEACHER!
+  len_prefix    -> 3the 6mirror 7watched 3the 7teacher
+task A -> /ptmp/karthiksing/soft-moe/conv/syncycle/base_data   personas [0, 1, 2, 3, 4, 5, 6] = ['prefix_zk', 'suffix_um', 'reverse', 'double_first', 'vowels_zero', 'bracket', 'caps_bang']   train rows: 2450
+task B -> /ptmp/karthiksing/soft-moe/conv/syncycle/new_data   personas [7] = ['len_prefix']   train rows: 350
+=== base backbone: Phase A on 7 base transforms (expert tokens frozen-random) ===
+step    1  loss 4.7786
+step  100  loss 0.3629
+step  200  loss 0.0347
+step  300  loss 0.0084
+step  400  loss 0.0012
+step  500  loss 0.0006
+step  600  loss 0.0007
+step  700  loss 0.0004
+step  800  loss 0.0003
+step  900  loss 0.0004
+step 1000  loss 0.0004
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/base_bb  (variant=em phase=backbone effective_trainable_params=3,085,400,064)
+RESULT  base_bb(before) new=  OVERALL  0.0%
+        base_bb(before) base=  OVERALL 99.8%
+###### REFERENCES ######
+phase 0 Bx300 done  loss 0.1946
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/r_tokonly  (schedule=B300)
+RESULT  ref:token-only(B300)  new=13.3%  base=64.3%
+step    1  loss 3.3691
+step   30  loss 0.1386
+step   60  loss 0.0019
+step   90  loss 0.0002
+step  120  loss 0.0001
+step  150  loss 0.0001
+step  180  loss 0.0001
+step  210  loss 0.0001
+step  240  loss 0.0001
+step  270  loss 0.0001
+step  300  loss 0.0001
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/r_full  (variant=em phase=full effective_trainable_params=3,085,400,064)
+RESULT  ref:full-SFT(300)  new=100.0%  base=26.7%
+phase 0 Ax150 done  loss 0.0001
+phase 1 Bx150 done  loss 0.0002
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/r_em1  (schedule=A150,B150)
+RESULT  ref:EM-1cycle(A150-first,B150)  new=100.0%  base=27.4%
+phase 0 Ax150 done  loss 0.0026
+phase 1 Bx150 done  loss 0.0172
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/r_replay  (schedule=A150,B150)
+RESULT  ref:REPLAY(A150 base+new,B150)  new=95.0%  base=84.8%
+###### Q1: token-first Pareto frontier vs backbone budget a  (B100, A{a}, B40) ######
+phase 0 Bx100 done  loss 0.9629
+phase 1 Bx40 done  loss 0.3834
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q1_a0  (schedule=B100,A0,B40)
+RESULT  q1:tokfirst-a0(B100,A0,B40)  new=1.7%  base=49.0%
+phase 0 Bx100 done  loss 0.2659
+phase 1 Ax10 done  loss 0.2089
+phase 2 Bx40 done  loss 0.1794
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q1_a10  (schedule=B100,A10,B40)
+RESULT  q1:tokfirst-a10(B100,A10,B40)  new=25.0%  base=78.8%
+phase 0 Bx100 done  loss 0.3549
+phase 1 Ax20 done  loss 0.1439
+phase 2 Bx40 done  loss 0.0660
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q1_a20  (schedule=B100,A20,B40)
+RESULT  q1:tokfirst-a20(B100,A20,B40)  new=58.3%  base=74.8%
+phase 0 Bx100 done  loss 0.2430
+phase 1 Ax40 done  loss 0.0075
+phase 2 Bx40 done  loss 0.0038
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q1_a40  (schedule=B100,A40,B40)
+RESULT  q1:tokfirst-a40(B100,A40,B40)  new=98.3%  base=62.9%
+phase 0 Bx100 done  loss 0.2480
+phase 1 Ax80 done  loss 0.0035
+phase 2 Bx40 done  loss 0.0004
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q1_a80  (schedule=B100,A80,B40)
+RESULT  q1:tokfirst-a80(B100,A80,B40)  new=100.0%  base=63.3%
+phase 0 Bx100 done  loss 0.2110
+phase 1 Ax150 done  loss 0.0001
+phase 2 Bx40 done  loss 0.0003
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q1_a150  (schedule=B100,A150,B40)
+RESULT  q1:tokfirst-a150(B100,A150,B40)  new=100.0%  base=73.6%
+###### Q2: granularity at fixed total backbone budget A=80, token-first, refit between ######
+phase 0 Bx100 done  loss 0.2629
+phase 1 Ax80 done  loss 0.0220
+phase 2 Bx40 done  loss 0.0026
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q2_n1  (schedule=B100,A80,B40)
+RESULT  q2:N1(A80x1)  new=98.3%  base=44.8%
+phase 0 Bx100 done  loss 0.2236
+phase 1 Ax40 done  loss 0.0344
+phase 2 Bx20 done  loss 0.0507
+phase 3 Ax40 done  loss 0.0028
+phase 4 Bx20 done  loss 0.0050
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q2_n2  (schedule=B100,A40,B20,A40,B20)
+RESULT  q2:N2(A40x2)  new=100.0%  base=61.4%
+phase 0 Bx100 done  loss 0.2693
+phase 1 Ax20 done  loss 0.1175
+phase 2 Bx15 done  loss 0.1206
+phase 3 Ax20 done  loss 0.0854
+phase 4 Bx15 done  loss 0.0654
+phase 5 Ax20 done  loss 0.0490
+phase 6 Bx15 done  loss 0.0218
+phase 7 Ax20 done  loss 0.0088
+phase 8 Bx15 done  loss 0.0091
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q2_n4  (schedule=B100,A20,B15,A20,B15,A20,B15,A20,B15)
+RESULT  q2:N4(A20x4)  new=93.3%  base=46.7%
+phase 0 Bx100 done  loss 0.2168
+phase 1 Ax10 done  loss 0.2435
+phase 2 Bx10 done  loss 0.1943
+phase 3 Ax10 done  loss 0.2309
+phase 4 Bx10 done  loss 0.1167
+phase 5 Ax10 done  loss 0.1082
+phase 6 Bx10 done  loss 0.0491
+phase 7 Ax10 done  loss 0.0310
+phase 8 Bx10 done  loss 0.0411
+phase 9 Ax10 done  loss 0.0928
+phase 10 Bx10 done  loss 0.0198
+phase 11 Ax10 done  loss 0.0125
+phase 12 Bx10 done  loss 0.0084
+phase 13 Ax10 done  loss 0.0279
+phase 14 Bx10 done  loss 0.0014
+phase 15 Ax10 done  loss 0.0461
+phase 16 Bx10 done  loss 0.0006
+saved -> /ptmp/karthiksing/soft-moe/conv/syncycle/q2_n8  (schedule=B100,A10,B10,A10,B10,A10,B10,A10,B10,A10,B10,A10,B10,A10,B10,A10,B10)
+RESULT  q2:N8(A10x8)  new=100.0%  base=20.2%
+SYNCYCLE_DONE
+                                  
+================================= 
+Global information about the job: 
+================================= 
+  
+Job owner: karthiksing(51852)
+Job name:  syncycle
+Node list: ravg1020
+Job start: Mon Jul 13 14:58:54 CEST 2026
+Job end:   Mon Jul 13 15:29:27 CEST 2026
+Work dir:  /u/karthiksing/projects/soft-moe
+Command:   .slurm/syncycle.sbatch
+  
+  
+  
+==========================================================================================
+Information on jobsteps (Note: MaxRSS/AveRSS is the maximum/average over all 
+tasks of the per-task memory high-water marks; cf. "man sacct"): 
+==========================================================================================
+  
+JobID            JobName NNodes NTasks  NCPUS       MaxRSS       AveRSS    Elapsed ExitCode
+------------- ---------- ------ ------ ------ ------------ ------------ ---------- --------
+28813937        syncycle      1            32                             00:30:33      0:0
+  
+Maximum memory per node: 20.178846 GB (defined as MaxRSS*Ntasks/NNodes)
+CPU utilization: 6.6 %
+  

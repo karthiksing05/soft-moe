@@ -120,3 +120,52 @@ there the capability was already in the backbone and the token merely pointed at
 token hits a ceiling. This is exactly why the pirate/robot personas were the wrong probe: they let a frozen
 backbone look more capable than it is. Strip the crutch away and you see the real division of labour — **the
 expert token is a load-bearing *selector*, not a *store of new computation*.**
+
+---
+
+## Part 3 — can we make EM incremental *and* forgetting-robust? (cyclic A/B schedules)
+
+Part 2 leaves a tantalising gap: token-only keeps the base but can't learn the novel transform; full-SFT/EM
+learn it but forget. Can a **cyclic A/B schedule** get token-only's retention *with* full-SFT's performance —
+**without replaying the base data** (token-only's whole appeal was needing none)?
+
+**The mechanism to exploit.** Base retention depends *only* on how far the backbone drifts from `base_bb` —
+Phase B (tokens) never moves the backbone, only Phase A does. And gradient magnitude tracks the loss. So if
+the new token is **fit first** (a Phase B burst), the loss on the new data is already low when Phase A runs,
+so A's gradients — and thus the backbone drift, and thus the forgetting — are **small**. Prediction:
+**order matters** — fit the token *before* the backbone burst. (`train_cycle.py` runs an arbitrary
+`B100,A150,B40`-style schedule in-process; `syncycle*.sbatch`.)
+
+**Result — reordering recovers forgetting for free.** Same 150-step backbone budget, adding `len_prefix`, no
+base replay, 3 seeds (fixed base backbone, ±sd):
+
+![cyclic EM](figs/syncycle.png)
+
+| schedule | new transform | base retention |
+|---|---|---|
+| token-only (B only) | 22.8 ±5.5 | 82.0 ±2.6 |
+| full-SFT | 100 | 14.8 ±0.4 |
+| **A-first EM** — `A150 → B150` | 100 | **15.1 ±0.4** 💥 |
+| **token-first EM** — `B100 → A150 → B40` | 100 | **58.9 ±12.4** ✓ |
+| replay — `A150(base+new) → B150` | 82.2 ±4.4 | 92.6 ±5.6 |
+
+Two things stand out. First, **naive two-phase EM does *not* help forgetting**: A-first EM (Phase A then
+Phase B) lands at base **15%** — statistically identical to full-SFT. The two-phase structure alone buys
+nothing here. Second, **the order does**: moving the token fit *before* the backbone burst — identical
+compute, identical data, no base replay — lifts base retention **15% → 59%** while new stays at **100%**.
+Pre-fitting the token drains the loss the backbone would otherwise chase, so it barely moves. The
+[frontier](figs/syncycle.png) (right panel) shows token-first dominating the full-SFT / A-first corner across
+backbone budgets `a`: even `a≈40` already reaches new ≈98% while holding base in the 60s.
+
+**What did *not* work: granularity.** Splitting the same total backbone budget into more A/B cycles (N = 1 / 2
+/ 4 / 8 at fixed total A = 80) gave base = 45 / 61 / 47 / 20% — no trend, and the *finest* schedule forgot the
+*most*. Two identical-schedule runs elsewhere in the sweep differed by ~18 pts of base retention from
+data-order alone, so fine granularity distinctions are within noise. **The lever is the *order* (token-first),
+not the number of cycles.**
+
+**The ceiling, and the honest gap.** Replay (Phase A on a base+new mix) is best — base **93%** — but it
+requires keeping the old data around, which is exactly what token-only avoided. Token-first closes roughly
+two-thirds of the token-only→replay retention gap **with zero base data**, though at ~59% it does not fully
+reach replay and carries high variance. **Practical recipe for incremental EM: fit the new expert token
+first, then a short backbone burst, then a quick token refit** — a free, data-free mitigation of catastrophic
+forgetting. When base data is available, a small replay mix on top remains the most robust.

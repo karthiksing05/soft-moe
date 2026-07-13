@@ -62,6 +62,15 @@ worked with token-only because it was *latent*; new computation needs backbone s
 
 ![incremental novel transform](em-expert-tokens/figs/syninc.png)
 
+**Making EM incremental *and* forgetting-robust — order beats granularity:** base retention depends only on
+backbone drift, and a pre-fit token leaves low loss so the backbone barely moves. So (n=3, same 150-step
+budget, no replay) naive **A-first EM forgets like full-SFT** (base 15%), but reordering to **token-first**
+(fit token → backbone burst → refit) recovers base **15%→59%** at new=100% — for free. Splitting into more
+A/B cycles does *not* help (order, not granularity, is the lever); replay is the ceiling (base 93%) but needs
+the old data. *([SYNTHETIC_SYNTAX §3](em-expert-tokens/SYNTHETIC_SYNTAX.md#part-3--can-we-make-em-incremental-and-forgetting-robust-cyclic-ab-schedules))*
+
+![cyclic EM incremental](em-expert-tokens/figs/syncycle.png)
+
 ### 3. When does EM two-phase beat *standard* SFT? — many personas × few episodes
 64 personas at varying episodes each (Qwen2.5-3B): EM's edge over joint SFT **grows as episodes-per-persona
 shrink** — tied at 40, **+7% at 15, +19% at 5** — and learned tokens beat *frozen-random* ones only at low

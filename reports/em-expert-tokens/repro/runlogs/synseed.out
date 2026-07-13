@@ -1,0 +1,144 @@
+=== data + split + base+new mix ===
+K=8 transforms, 350 train / 60 test sentences
+example base: 'the forest chased the window'
+  prefix_zk     -> zkthe zkforest zkchased zkthe zkwindow
+  suffix_um     -> theum forestum chasedum theum windowum
+  reverse       -> eht tserof desahc eht wodniw
+  double_first  -> tthe fforest cchased tthe wwindow
+  vowels_zero   -> th0 f0r0st ch0s0d th0 w0nd0w
+  bracket       -> [the] [forest] [chased] [the] [window]
+  caps_bang     -> THE! FOREST! CHASED! THE! WINDOW!
+  len_prefix    -> 3the 6forest 6chased 3the 6window
+task A -> /ptmp/karthiksing/soft-moe/conv/synseed/base_data   personas [0, 1, 2, 3, 4, 5, 6] = ['prefix_zk', 'suffix_um', 'reverse', 'double_first', 'vowels_zero', 'bracket', 'caps_bang']   train rows: 2450
+task B -> /ptmp/karthiksing/soft-moe/conv/synseed/new_data   personas [7] = ['len_prefix']   train rows: 350
+=== fixed base backbone (Phase A on 7 base transforms) ===
+step    1  loss 4.2773
+step  100  loss 0.4852
+step  200  loss 0.0204
+step  300  loss 0.0105
+step  400  loss 0.0012
+step  500  loss 0.0007
+step  600  loss 0.0004
+step  700  loss 0.0005
+step  800  loss 0.0003
+step  900  loss 0.0003
+step 1000  loss 0.0004
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/base_bb  (variant=em phase=backbone effective_trainable_params=3,085,400,064)
+###### SEED 0 ######
+phase 0 Bx300 done  loss 0.1270
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/tokonly_0  (schedule=B300)
+RESULT  s0:token-only(B300)  new=30.0%  base=85.2%
+step    1  loss 3.1737
+step   30  loss 0.1087
+step   60  loss 0.0302
+step   90  loss 0.0002
+step  120  loss 0.0001
+step  150  loss 0.0001
+step  180  loss 0.0001
+step  210  loss 0.0001
+step  240  loss 0.0001
+step  270  loss 0.0001
+step  300  loss 0.0001
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/full_0  (variant=em phase=full effective_trainable_params=3,085,400,064)
+RESULT  s0:full-SFT(300)  new=100.0%  base=15.2%
+phase 0 Ax150 done  loss 0.0001
+phase 1 Bx150 done  loss 0.0001
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/afirst_0  (schedule=A150,B150)
+RESULT  s0:A-first(A150,B150)  new=100.0%  base=15.5%
+phase 0 Bx100 done  loss 0.1991
+phase 1 Ax150 done  loss 0.0001
+phase 2 Bx40 done  loss 0.0002
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/tfirst_0  (schedule=B100,A150,B40)
+RESULT  s0:token-first(B100,A150,B40)  new=100.0%  base=76.2%
+phase 0 Ax150 done  loss 0.0005
+phase 1 Bx150 done  loss 0.0516
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/replay_0  (schedule=A150,B150)
+RESULT  s0:REPLAY(A150 base+new,B150)  new=78.3%  base=93.1%
+###### SEED 1 ######
+phase 0 Bx300 done  loss 0.1473
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/tokonly_1  (schedule=B300)
+RESULT  s1:token-only(B300)  new=16.7%  base=78.8%
+step    1  loss 2.9478
+step   30  loss 0.1079
+step   60  loss 0.0019
+step   90  loss 0.0001
+step  120  loss 0.0001
+step  150  loss 0.0001
+step  180  loss 0.0001
+step  210  loss 0.0001
+step  240  loss 0.0001
+step  270  loss 0.0001
+step  300  loss 0.0001
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/full_1  (variant=em phase=full effective_trainable_params=3,085,400,064)
+RESULT  s1:full-SFT(300)  new=100.0%  base=15.0%
+phase 0 Ax150 done  loss 0.0001
+phase 1 Bx150 done  loss 0.0001
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/afirst_1  (schedule=A150,B150)
+RESULT  s1:A-first(A150,B150)  new=100.0%  base=14.5%
+phase 0 Bx100 done  loss 0.2261
+phase 1 Ax150 done  loss 0.0003
+phase 2 Bx40 done  loss 0.0004
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/tfirst_1  (schedule=B100,A150,B40)
+RESULT  s1:token-first(B100,A150,B40)  new=100.0%  base=52.9%
+phase 0 Ax150 done  loss 0.0389
+phase 1 Bx150 done  loss 0.0229
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/replay_1  (schedule=A150,B150)
+RESULT  s1:REPLAY(A150 base+new,B150)  new=80.0%  base=85.5%
+###### SEED 2 ######
+phase 0 Bx300 done  loss 0.1496
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/tokonly_2  (schedule=B300)
+RESULT  s2:token-only(B300)  new=21.7%  base=82.1%
+step    1  loss 2.9904
+step   30  loss 0.1105
+step   60  loss 0.0042
+step   90  loss 0.0002
+step  120  loss 0.0001
+step  150  loss 0.0001
+step  180  loss 0.0001
+step  210  loss 0.0001
+step  240  loss 0.0001
+step  270  loss 0.0001
+step  300  loss 0.0001
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/full_2  (variant=em phase=full effective_trainable_params=3,085,400,064)
+RESULT  s2:full-SFT(300)  new=100.0%  base=14.3%
+phase 0 Ax150 done  loss 0.0001
+phase 1 Bx150 done  loss 0.0001
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/afirst_2  (schedule=A150,B150)
+RESULT  s2:A-first(A150,B150)  new=100.0%  base=15.2%
+phase 0 Bx100 done  loss 0.2781
+phase 1 Ax150 done  loss 0.0001
+phase 2 Bx40 done  loss 0.0002
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/tfirst_2  (schedule=B100,A150,B40)
+RESULT  s2:token-first(B100,A150,B40)  new=100.0%  base=47.6%
+phase 0 Ax150 done  loss 0.0002
+phase 1 Bx150 done  loss 0.0223
+saved -> /ptmp/karthiksing/soft-moe/conv/synseed/replay_2  (schedule=A150,B150)
+RESULT  s2:REPLAY(A150 base+new,B150)  new=88.3%  base=99.3%
+SYNSEED_DONE
+                                  
+================================= 
+Global information about the job: 
+================================= 
+  
+Job owner: karthiksing(51852)
+Job name:  synseed
+Node list: ravg1060
+Job start: Mon Jul 13 15:35:11 CEST 2026
+Job end:   Mon Jul 13 16:10:16 CEST 2026
+Work dir:  /u/karthiksing/projects/soft-moe
+Command:   .slurm/syncycle_seeds.sbatch
+  
+  
+  
+==========================================================================================
+Information on jobsteps (Note: MaxRSS/AveRSS is the maximum/average over all 
+tasks of the per-task memory high-water marks; cf. "man sacct"): 
+==========================================================================================
+  
+JobID            JobName NNodes NTasks  NCPUS       MaxRSS       AveRSS    Elapsed ExitCode
+------------- ---------- ------ ------ ------ ------------ ------------ ---------- --------
+28814147         synseed      1            32                             00:35:05      0:0
+  
+Maximum memory per node: 20.180591 GB (defined as MaxRSS*Ntasks/NNodes)
+CPU utilization: 6.6 %
+  

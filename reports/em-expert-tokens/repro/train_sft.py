@@ -35,7 +35,10 @@ def main() -> int:
     ap.add_argument("--save-steps", default=None, help="comma-sep milestones to snapshot as <out>__s<step> (convergence curves)")
     ap.add_argument("--dry-run", action="store_true", help="load + one forward/backward, no train/save (compat check)")
     ap.add_argument("--lora", action="store_true", help="parameter-efficient FT (for the 14B MoE on 1-2 GPUs)")
+    ap.add_argument("--seed", type=int, default=None, help="seed torch (data-order) for multi-seed error bars")
     a = ap.parse_args()
+    if a.seed is not None:
+        torch.manual_seed(a.seed)
     from transformers import AutoModelForCausalLM, AutoTokenizer
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.bfloat16 if dev == "cuda" else torch.float32
