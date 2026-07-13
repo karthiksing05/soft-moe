@@ -1,7 +1,10 @@
 {
-  "accuracy": {"control\n(generic token)": 10.8, "EM\n(right token)": 99.6, "EM\n(wrong token)": 0.0},
+  "accuracy": {"control": 12.1, "SFT ✓": 100.0, "SFT swap": 0.0, "EM ✓": 99.6, "EM swap": 0.0},
   "chance": 12.5,
-  "swap_ppl": {"prefix_zk": 8.56, "suffix_um": 19.68, "reverse": 10.93, "double_first": 3.08,
-               "vowels_zero": 5.36, "bracket": 3.53, "caps_bang": 4.73, "len_prefix": 2.67},
-  "right_ppl": 1.001, "control_ppl": 1.16, "swap_mean": 7.32
+  "macro_ppl": {"control": 1.159, "SFT": 1.000, "EM": 1.001},
+  "swap_ppl_sft": {"prefix_zk": 4.94, "suffix_um": 60.08, "reverse": 8.21, "double_first": 3.47,
+                   "vowels_zero": 7.20, "bracket": 4.33, "caps_bang": 5.27, "len_prefix": 3.12},
+  "swap_ppl_em": {"prefix_zk": 7.48, "suffix_um": 7.86, "reverse": 5.21, "double_first": 1.82,
+                  "vowels_zero": 3.26, "bracket": 2.38, "caps_bang": 6.53, "len_prefix": 2.30},
+  "swap_mean_sft": 12.08, "swap_mean_em": 4.61
 }

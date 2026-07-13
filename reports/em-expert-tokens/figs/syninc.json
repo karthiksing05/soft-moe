@@ -1,0 +1,12 @@
+{
+  "base_before": {"new": 0.0, "base": 99.8},
+  "arms": {
+    "token-only\n(frozen backbone)": {"steps": [30, 100, 300], "new": [0.0, 15.0, 41.7],
+        "final_new": 41.7, "final_base": 86.7, "params": "16K", "color": "#2e8b57"},
+    "full-SFT":                       {"steps": [30, 100, 300], "new": [38.3, 98.3, 100.0],
+        "final_new": 100.0, "final_base": 7.1, "params": "3.09B", "color": "#c0504d"},
+    "EM two-phase":                   {"steps": [30, 100, 150], "new": [45.0, 100.0, 100.0],
+        "final_new": 100.0, "final_base": 0.0, "params": "3.09B", "color": "#8064a2"}
+  },
+  "data_eff_n": [5, 25, 100, 350], "data_eff_acc": [0.0, 5.0, 6.7, 15.0], "data_eff_steps": 100
+}

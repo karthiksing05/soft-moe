@@ -46,12 +46,21 @@ it **doubles accuracy** (50% coin-flip ceiling → ~100%, swap → 0%); when rec
 ### 2. Is the token *really* load-bearing? — impossible synthetic syntax
 8 personas = arbitrary word transforms (`reverse`, `vowels→0`, `zk`-prefix, …) of a sentence given in the
 prompt — **impossible to guess from priors**, so the only signal is the token. A generic marker scores
-**10.8%** exact-match (≈ chance, collapses to one transform); the right `<|expert_k|>` token scores **99.6%**;
-the *wrong* token scores **0.0%** (cleanly produces another persona's transform). Swap-ratio **×7.32** vs the
-mere ×1.87 for pretrained styles — with no crutch, the token carries **100%** of the persona.
-*([SYNTHETIC_SYNTAX](em-expert-tokens/SYNTHETIC_SYNTAX.md))*
+**12.1%** exact-match (≈ chance, collapses to a few transforms); the right `<|expert_k|>` token scores **100%
+(joint SFT) / 99.6% (EM two-phase)**; the *wrong* token scores **0.0%** (cleanly produces another persona's
+transform). Both training schemes are fully load-bearing — EM's Phase B locks in all 8 with just **16 K token
+params**. With no crutch, the token carries **100%** of the persona. *([SYNTHETIC_SYNTAX](em-expert-tokens/SYNTHETIC_SYNTAX.md))*
 
 ![synthetic syntax](em-expert-tokens/figs/synsyntax.png)
+
+**But the token *selects*, it doesn't *store new computation*:** adding a *genuinely novel* transform to a
+trained backbone exposes a no-free-lunch trade-off the pretrained styles hid. **Token-only** (frozen backbone,
+one new embedding) keeps the base personas (86.7%) but only *partially* learns the novel transform (**41.7%**,
+plateaus); **full-SFT / EM** reach **100%** on it but **catastrophically forget** the base (7.1% / 0%). A style
+worked with token-only because it was *latent*; new computation needs backbone surgery that forgets.
+*([SYNTHETIC_SYNTAX §2](em-expert-tokens/SYNTHETIC_SYNTAX.md#part-2--incrementally-adding-a-genuinely-novel-transform))*
+
+![incremental novel transform](em-expert-tokens/figs/syninc.png)
 
 ### 3. When does EM two-phase beat *standard* SFT? — many personas × few episodes
 64 personas at varying episodes each (Qwen2.5-3B): EM's edge over joint SFT **grows as episodes-per-persona
