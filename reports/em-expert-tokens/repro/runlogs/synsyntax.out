@@ -1,0 +1,197 @@
+=== generate synthetic-syntax data ===
+K=8 transforms, 350 train / 60 test sentences
+example base: 'the forest lost the bottle'
+  prefix_zk     -> zkthe zkforest zklost zkthe zkbottle
+  suffix_um     -> theum forestum lostum theum bottleum
+  reverse       -> eht tserof tsol eht elttob
+  double_first  -> tthe fforest llost tthe bbottle
+  vowels_zero   -> th0 f0r0st l0st th0 b0ttl0
+  bracket       -> [the] [forest] [lost] [the] [bottle]
+  caps_bang     -> THE! FOREST! LOST! THE! BOTTLE!
+  len_prefix    -> 3the 6forest 4lost 3the 6bottle
+=== train CONTROL (generic marker, joint) ===
+step    1  loss 5.1203
+step  150  loss 0.3367
+step  300  loss 0.1772
+step  450  loss 0.1941
+step  600  loss 0.1378
+step  750  loss 0.1565
+step  900  loss 0.1487
+step 1050  loss 0.1545
+step 1200  loss 0.1407
+step 1350  loss 0.1518
+step 1500  loss 0.1578
+saved -> /ptmp/karthiksing/soft-moe/conv/synsyntax/control  (variant=control phase=full effective_trainable_params=3,085,938,688)
+=== train SFT (per-persona token, JOINT full FT) ===
+step    1  loss 3.7846
+step  150  loss 0.1248
+step  300  loss 0.0314
+step  450  loss 0.0037
+step  600  loss 0.0004
+step  750  loss 0.0004
+step  900  loss 0.0004
+step 1050  loss 0.0003
+step 1200  loss 0.0003
+step 1350  loss 0.0003
+step 1500  loss 0.0003
+saved -> /ptmp/karthiksing/soft-moe/conv/synsyntax/sft  (variant=em phase=full effective_trainable_params=3,085,400,064)
+=== train EM two-phase: Phase A backbone (tokens frozen) 1000 -> Phase B tokens (backbone frozen) 500 ===
+step    1  loss 4.0667
+step  100  loss 0.3428
+step  200  loss 0.0219
+step  300  loss 0.0085
+step  400  loss 0.0094
+step  500  loss 0.0009
+step  600  loss 0.0006
+step  700  loss 0.0007
+step  800  loss 0.0004
+step  900  loss 0.0003
+step 1000  loss 0.0004
+saved -> /ptmp/karthiksing/soft-moe/conv/synsyntax/emA  (variant=em phase=backbone effective_trainable_params=3,085,400,064)
+step    1  loss 0.0005  expert_row_grad 8.18e-03
+step   50  loss 2.3549  expert_row_grad 3.30e+00
+step  100  loss 1.3669  expert_row_grad 1.52e+00
+step  150  loss 0.0003  expert_row_grad 6.07e-04
+step  200  loss 0.0008  expert_row_grad 5.46e-03
+step  250  loss 0.0006  expert_row_grad 1.02e-03
+step  300  loss 0.0004  expert_row_grad 1.25e-03
+step  350  loss 0.0007  expert_row_grad 2.03e-03
+step  400  loss 0.0005  expert_row_grad 8.89e-04
+step  450  loss 0.0017  expert_row_grad 1.07e-02
+step  500  loss 0.0005  expert_row_grad 1.14e-03
+saved -> /ptmp/karthiksing/soft-moe/conv/synsyntax/em  (variant=em phase=tokens effective_trainable_params=16,384)
+###### PERPLEXITY + SWAP ######
+----- CONTROL (generic token) -----
+  prefix_zk ppl   1.184
+  suffix_um ppl   1.196
+  reverse   ppl   1.209
+  double_first ppl   1.213
+  vowels_zero ppl   1.131
+  bracket   ppl   1.122
+  caps_bang ppl   1.142
+  len_prefix ppl   1.126
+  MACRO ppl 1.159
+----- SFT (per-persona token, joint) -----
+  prefix_zk ppl   1.001   wrong-expert ppl   4.945  (x4.94)
+  suffix_um ppl   1.000   wrong-expert ppl  60.095  (x60.08)
+  reverse   ppl   1.001   wrong-expert ppl   8.223  (x8.21)
+  double_first ppl   1.000   wrong-expert ppl   3.468  (x3.47)
+  vowels_zero ppl   1.000   wrong-expert ppl   7.204  (x7.20)
+  bracket   ppl   1.000   wrong-expert ppl   4.328  (x4.33)
+  caps_bang ppl   1.000   wrong-expert ppl   5.268  (x5.27)
+  len_prefix ppl   1.000   wrong-expert ppl   3.122  (x3.12)
+  MACRO ppl 1.000   swap-ratio (wrong/right) mean x12.08
+----- EM (per-persona token, two-phase) -----
+  prefix_zk ppl   1.001   wrong-expert ppl   7.488  (x7.48)
+  suffix_um ppl   1.001   wrong-expert ppl   7.869  (x7.86)
+  reverse   ppl   1.002   wrong-expert ppl   5.221  (x5.21)
+  double_first ppl   1.001   wrong-expert ppl   1.824  (x1.82)
+  vowels_zero ppl   1.003   wrong-expert ppl   3.264  (x3.26)
+  bracket   ppl   1.000   wrong-expert ppl   2.379  (x2.38)
+  caps_bang ppl   1.001   wrong-expert ppl   6.532  (x6.53)
+  len_prefix ppl   1.000   wrong-expert ppl   2.303  (x2.30)
+  MACRO ppl 1.001   swap-ratio (wrong/right) mean x4.61
+###### EXACT-MATCH GENERATION ACCURACY ######
+----- CONTROL -----
+  [len_prefix] want='3the 5baker 6pushed 3the 4wolf' got='THE! BAKER! PUSHED! THE! WOLF!' X
+  [caps_bang] want='THE! WITCH! PRAISED! THE! CANDLE!' got='theum witchum praisedum theum candleum' X
+  [double_first] want='tthe rrobot llifted tthe ssailor' got='theum robotum liftedum theum sailorum' X
+  [double_first] want='tthe ffarmer ppushed tthe ccandle' got='THE! FARMER! PUSHED! THE! CANDLE!' X
+### control: exact-match accuracy
+  prefix_zk      0.0%
+  suffix_um     24.0%
+  reverse        0.0%
+  double_first   0.0%
+  vowels_zero    0.0%
+  bracket        0.0%
+  caps_bang     48.4%
+  len_prefix    29.6%
+  OVERALL 12.1%
+----- SFT (right token) -----
+  [vowels_zero] want='th0 c0ndl0 ch0s0d th0 br0dg0' got='th0 c0ndl0 ch0s0d th0 br0dg0' OK
+  [caps_bang] want='THE! CAT! CARRIED! THE! CHILD!' got='THE! CAT! CARRIED! THE! CHILD!' OK
+  [caps_bang] want='THE! PILOT! PRAISED! THE! CAT!' got='THE! PILOT! PRAISED! THE! CAT!' OK
+  [bracket] want='[the] [cat] [carried] [the] [child]' got='[the] [cat] [carried] [the] [child]' OK
+### em: exact-match accuracy
+  prefix_zk     100.0%
+  suffix_um     100.0%
+  reverse       100.0%
+  double_first  100.0%
+  vowels_zero   100.0%
+  bracket       100.0%
+  caps_bang     100.0%
+  len_prefix    100.0%
+  OVERALL 100.0%
+----- SFT (WRONG token/swap) -----
+  [vowels_zero] want='th0 c0ndl0 ch0s0d th0 br0dg0' got='[the] [candle] [chased] [the] [bridge]' X
+  [caps_bang] want='THE! CAT! CARRIED! THE! CHILD!' got='3the 3cat 7carried 3the 5child' X
+  [caps_bang] want='THE! PILOT! PRAISED! THE! CAT!' got='3the 5pilot 7praised 3the 3cat' X
+  [bracket] want='[the] [cat] [carried] [the] [child]' got='THE! CAT! CARRIED! THE! CHILD!' X
+### em+SWAP(wrong token): exact-match accuracy
+  prefix_zk      0.0%
+  suffix_um      0.0%
+  reverse        0.0%
+  double_first   0.0%
+  vowels_zero    0.0%
+  bracket        0.0%
+  caps_bang      0.0%
+  len_prefix     0.0%
+  OVERALL  0.0%
+----- EM (right token) -----
+  [vowels_zero] want='th0 c0ndl0 ch0s0d th0 br0dg0' got='th0 c0ndl0 ch0s0d th0 br0dg0' OK
+  [caps_bang] want='THE! CAT! CARRIED! THE! CHILD!' got='THE! CAT! CARRIED! THE! CHILD!' OK
+  [caps_bang] want='THE! PILOT! PRAISED! THE! CAT!' got='THE! PILOT! PRAISED! THE! CAT!' OK
+  [bracket] want='[the] [cat] [carried] [the] [child]' got='[the] [cat] [carried] [the] [child]' OK
+### em: exact-match accuracy
+  prefix_zk     100.0%
+  suffix_um     100.0%
+  reverse       100.0%
+  double_first  100.0%
+  vowels_zero   97.1%
+  bracket       100.0%
+  caps_bang     100.0%
+  len_prefix    100.0%
+  OVERALL 99.6%
+----- EM (WRONG token/swap) -----
+  [vowels_zero] want='th0 c0ndl0 ch0s0d th0 br0dg0' got='[the] [candle] [chased] [the] [bridge]' X
+  [caps_bang] want='THE! CAT! CARRIED! THE! CHILD!' got='3the 3cat 7carried 3the 5child' X
+  [caps_bang] want='THE! PILOT! PRAISED! THE! CAT!' got='3the 5pilot 7praised 3the 3cat' X
+  [bracket] want='[the] [cat] [carried] [the] [child]' got='THE! CAT! CARRIED! THE! CHILD!' X
+### em+SWAP(wrong token): exact-match accuracy
+  prefix_zk      0.0%
+  suffix_um      0.0%
+  reverse        0.0%
+  double_first   0.0%
+  vowels_zero    0.0%
+  bracket        0.0%
+  caps_bang      0.0%
+  len_prefix     0.0%
+  OVERALL  0.0%
+SYNSYNTAX_DONE
+                                  
+================================= 
+Global information about the job: 
+================================= 
+  
+Job owner: karthiksing(51852)
+Job name:  synsyntax
+Node list: ravg1076
+Job start: Mon Jul 13 11:07:28 CEST 2026
+Job end:   Mon Jul 13 11:37:17 CEST 2026
+Work dir:  /u/karthiksing/projects/soft-moe
+Command:   .slurm/synsyntax.sbatch
+  
+  
+  
+==========================================================================================
+Information on jobsteps (Note: MaxRSS/AveRSS is the maximum/average over all 
+tasks of the per-task memory high-water marks; cf. "man sacct"): 
+==========================================================================================
+  
+JobID            JobName NNodes NTasks  NCPUS       MaxRSS       AveRSS    Elapsed ExitCode
+------------- ---------- ------ ------ ------ ------------ ------------ ---------- --------
+28810502       synsyntax      1            32                             00:29:49      0:0
+  
+Maximum memory per node: 29.528756 GB (defined as MaxRSS*Ntasks/NNodes)
+CPU utilization: 6.0 %
+  
