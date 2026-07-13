@@ -1,0 +1,7 @@
+{
+  "accuracy": {"control\n(generic token)": 10.8, "EM\n(right token)": 99.6, "EM\n(wrong token)": 0.0},
+  "chance": 12.5,
+  "swap_ppl": {"prefix_zk": 8.56, "suffix_um": 19.68, "reverse": 10.93, "double_first": 3.08,
+               "vowels_zero": 5.36, "bracket": 3.53, "caps_bang": 4.73, "len_prefix": 2.67},
+  "right_ppl": 1.001, "control_ppl": 1.16, "swap_mean": 7.32
+}

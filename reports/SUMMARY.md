@@ -43,21 +43,31 @@ it **doubles accuracy** (50% coin-flip ceiling → ~100%, swap → 0%); when rec
 
 ![knowledge](em-expert-tokens/figs/knowledge_results.png)
 
-### 2. When does EM two-phase beat *standard* SFT? — many personas × few episodes
+### 2. Is the token *really* load-bearing? — impossible synthetic syntax
+8 personas = arbitrary word transforms (`reverse`, `vowels→0`, `zk`-prefix, …) of a sentence given in the
+prompt — **impossible to guess from priors**, so the only signal is the token. A generic marker scores
+**10.8%** exact-match (≈ chance, collapses to one transform); the right `<|expert_k|>` token scores **99.6%**;
+the *wrong* token scores **0.0%** (cleanly produces another persona's transform). Swap-ratio **×7.32** vs the
+mere ×1.87 for pretrained styles — with no crutch, the token carries **100%** of the persona.
+*([SYNTHETIC_SYNTAX](em-expert-tokens/SYNTHETIC_SYNTAX.md))*
+
+![synthetic syntax](em-expert-tokens/figs/synsyntax.png)
+
+### 3. When does EM two-phase beat *standard* SFT? — many personas × few episodes
 64 personas at varying episodes each (Qwen2.5-3B): EM's edge over joint SFT **grows as episodes-per-persona
 shrink** — tied at 40, **+7% at 15, +19% at 5** — and learned tokens beat *frozen-random* ones only at low
 data. *([EM_VS_SFT](em-expert-tokens/EM_VS_SFT.md))*
 
 ![emwin](em-expert-tokens/figs/emwin.png)
 
-### 3. Cold-start / imbalanced data (thesis's core claim)
+### 4. Cold-start / imbalanced data (thesis's core claim)
 Persona train volumes **450 → 4** examples, balanced test: EM **crushes joint SFT (−38%** ppl), rescuing the
 4-example persona **43 → 8.5** — Phase B fits starved embeddings against a capable frozen backbone.
 *([COLDSTART_RESULTS](em-expert-tokens/COLDSTART_RESULTS.md))*
 
 ![coldstart](em-expert-tokens/figs/coldstart.png)
 
-### 4. Adding a new persona: token-only vs full SFT vs EM (incremental training)
+### 5. Adding a new persona: token-only vs full SFT vs EM (incremental training)
 Add an 8th persona to a 7-persona backbone. **token-only** (fit ~one embedding, backbone frozen) adds it
 **25 → 6.3 ppl in ~30 steps** from ~25 examples with the **base personas retained (5.2)**; **EM** gives the
 best/most-stable new-persona quality (5.9, no overfit) but its Phase A **forgets the base (→ 9.5)**; **full
@@ -71,14 +81,14 @@ strongly load-bearing (swap 1.3 → 5–17) once the backbone has seen **~32+** 
 
 ![incremental scaling](em-expert-tokens/figs/scaleinc.png)
 
-### 5. Embedding collapse (thesis's 2nd metric)
+### 6. Embedding collapse (thesis's 2nd metric)
 Geometry of the learned tokens: EM keeps them **~10× more separated** than joint SFT (mean cosine
 **0.23 → 0.06**), monotonic in Phase-B budget — resisting the collapse the thesis warns about.
 *([COLLAPSE_RESULTS](em-expert-tokens/COLLAPSE_RESULTS.md))*
 
 ![collapse](em-expert-tokens/figs/collapse.png)
 
-### 6. The token creates a linearly separable persona space (alternation vs frozen vs SFT)
+### 7. The token creates a linearly separable persona space (alternation vs frozen vs SFT)
 Token-induced representation shift Δ = h(persona token) − h(generic marker): a held-out linear probe recovers
 which of 8 personas at **100%** (vs 12.5% chance) — 8 clean clusters — in **every** scheme. The *token*, not
 the alternation, builds the separable space (frozen ≈ SFT ≥ EM by margin on balanced data).
@@ -86,7 +96,7 @@ the alternation, builds the separable space (frozen ≈ SFT ≥ EM by margin on 
 
 ![separability](em-expert-tokens/figs/separability.png)
 
-### 7. Does alternating cycle *faster or slower*?
+### 8. Does alternating cycle *faster or slower*?
 Trajectory of joint SFT vs continuous backbone vs cycling-EM: cycling is **slower per step** (Phase-B steps
 are ~flat) with no upside on knowledge, but **resists late overfitting** on persona.
 *([CONVERGENCE_RESULTS §5](convergence/CONVERGENCE_RESULTS.md#5-does-alternating-converge-faster-or-slower-trajectory))*
